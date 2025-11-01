@@ -124,8 +124,25 @@ ensures the parent’s setup runs before your code. If you skip it, you may miss
 
 ---------------------------------------------------------------------------
 
-⚙️ 8. uvm_config_db — The Configuration Database
-A hierarchical key–value database for passing configuration or object handles (like virtual interfaces) from parent components (test/env) to children (agent/driver/monitor).
+⚙️ 8. What is the UVM Configuration Database?
+The UVM Configuration Database (or uvm_config_db) is like a mailbox system that lets one component send information to another component without direct connections.
+
+💡 Simple idea:
+You can store a value in the config database at one level and later retrieve (get) it from another level of the hierarchy.
+This allows you to pass settings or handles (like virtual interfaces) down the testbench tree easily.
+
+🧠 Why do we need config_db?
+Imagine this situation:
+Your top-level test creates the environment (env).
+The env creates an agent.
+The agent creates a driver, monitor, and sequencer.
+
+Now, your driver needs to drive the DUT pins. But the driver doesn’t have a direct connection to the top module where the DUT interface is declared.
+❓ So how can the top-level test give that virtual interface to the driver?
+
+👉 That’s where the configuration database helps.
+It lets the top-level component set that interface and the lower-level component get it safely — no manual connections, no messy wiring.
+uvm_config_db — The Configuration Database
 
 Think:
 A parent leaves a “sticky note” with settings for its children. Each child reads its note during build_phase.
@@ -144,7 +161,12 @@ Hierarchical propagation of settings
 
 ---------------------------------------------------------------------------
 
-🔑 10. The API
+🔑 10. How it works in practice
+
+There are two main actions:
+Action	                           Function	                                    What it means
+Set	                          uvm_config_db::set()	                    Post a message (store data)
+Get	                          uvm_config_db::get()	                    Read that message (retrieve data)
 
 Set (from parent)
 uvm_config_db#(T)::set(
