@@ -86,8 +86,18 @@ Monitor publishes observed transactions to scoreboard/coverage via analysis port
 
 -------------------------------------------
 6)
-“Why do we need uvm_object vs uvm_component?”
-→ Objects are light data; Components are hierarchical building blocks with phases.
+
+Q: What’s a uvm_component?
+A: A class that lives in the UVM hierarchy (has a parent/name), participates in phases (build/connect/run/etc.), and communicates via TLM ports. Examples: test, env, agent, driver, monitor, sequencer, scoreboard.
+
+Q: What’s a uvm_object?
+A: Lightweight data/recipe class with no hierarchy or phases. Examples: transactions (sequence items), sequences, config objects.
+
+Q: How do driver and sequencer talk?
+A: seq_item_port ↔ seq_item_export in connect_phase. Driver pulls items.
+
+Q: “Why do we need uvm_object vs uvm_component?”
+A: Objects are light data; Components are hierarchical building blocks with phases.
 
 “Where do I put code that toggles pins?”
 → In the driver.run_phase (use a virtual interface).
