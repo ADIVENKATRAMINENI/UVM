@@ -1,0 +1,289 @@
+What is the build_phase?
+In a UVM testbench, everything happens in a sequence of steps called phases.
+
+Think of simulation like a movie production:
+First, you build the set and actors 🎬
+Then, you connect the cameras and lights 🔌
+Finally, you run the movie (action time!) 🎥
+
+So, build_phase is that first step — “Let’s build all the parts (testbench components) before the simulation starts.”
+
+
+1. The Build Phase
+What is it?
+build_phase() is one of UVM’s standard simulation phases that runs before simulation time starts.
+
+It is used to:
+Create subcomponents (drivers, monitors, sequencers, etc.)
+Pull configuration data (from uvm_config_db)
+Prepare hierarchy and connections
+
+Where does it come from?
+build_phase() is a virtual function already defined inside the UVM base class uvm_component:
+
+virtual function void build_phase(uvm_phase phase);
+endfunction
+
+Every UVM component inherits this function, so you don’t create it from scratch. You simply override it to define what your own component does during build.
+
+---------------------------------------------------------------------------
+
+⚙️ 2. Syntax and Meaning
+function void build_phase(uvm_phase phase);
+  super.build_phase(phase);
+
+  drv  = my_driver   ::type_id::create("drv" , this);
+  mon  = my_monitor  ::type_id::create("mon" , this);
+  seqr = my_sequencer::type_id::create("seqr", this);
+endfunction
+
+Explanation:
+Line	                                                                                     Meaning
+function void build_phase(uvm_phase phase);	               Override the parent’s virtual function. It returns nothing (void) and gets a handle to the current phase.
+super.build_phase(phase);	                                               Call the parent’s build first (important UVM best practice).
+drv = my_driver::type_id::create("drv", this);	                     Ask the UVM factory to create a my_driver instance named "drv" and make this agent its parent.
+"drv", "mon", "seqr"	                                      Instance names. They appear in the hierarchy (uvm_test_top.env.agent.drv) and are used for configuration lookups.
+this	                                                                    Parent pointer (current component). Maintains proper UVM hierarchy.
+
+function - We use it because we are not doing or running any task in simulation. We are just building connceting components before simulation starts.
+void- we are not returning anything, just building and connceting.
+uvm_phase phase - This is handle fo rthe current build phase function .
+super.build..... - we should call parent class once so that those function will run first and set up everything before we access and override.
+my_driver - Its the extended class name we are going to use in driver component and keep drv handle name. this is for child for this module(example agent)
+
+---------------------------------------------------------------------------
+
+3. Why use ::type_id::create() instead of new
+new	                                                                   ::type_id::create()
+Creates a fixed type — cannot be overridden.	           Creates via UVM factory — can be type-overridden in tests.
+No awareness of UVM hierarchy.	                                  Registers automatically inside UVM hierarchy.
+Hard to reuse or replace.	                                        Enables reusability and configurability.
+
+✅ Always use ::type_id::create() for UVM components.
+
+---------------------------------------------------------------------------
+
+4. Why build_phase Is a Function (Not a Task)
+Functions execute instantly (no #delay, @, or wait).
+Build/connect happen before simulation time, so no time should elapse.
+Therefore they are declared as function void ....
+The run_phase is a task because it drives/monitors signals over simulation time.
+
+---------------------------------------------------------------------------
+
+5. Virtual Functions Refresher
+A virtual function lets child classes override parent behavior. At runtime, SystemVerilog automatically calls the child’s version.
+
+Example:
+class Animal;
+  virtual function void speak(); $display("Some sound"); endfunction
+endclass
+
+class Dog extends Animal;
+  function void speak(); $display("Woof"); endfunction
+endclass
+
+Even if you hold a Animal handle, calling speak() on a Dog object prints Woof.
+
+UVM uses this concept to allow your components’ customized build_phase, connect_phase, run_phase, etc., to execute automatically.
+
+---------------------------------------------------------------------------
+
+6. Hierarchy Creation Example
+class my_agent extends uvm_agent;
+  `uvm_component_utils(my_agent)
+
+  my_driver     drv;
+  my_monitor    mon;
+  my_sequencer  seqr;
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    mon  = my_monitor ::type_id::create("mon", this);
+    if (is_active == UVM_ACTIVE) begin
+      drv  = my_driver  ::type_id::create("drv" , this);
+      seqr = my_sequencer::type_id::create("seqr", this);
+    end
+  endfunction
+
+  function void connect_phase(uvm_phase phase);
+    if (is_active == UVM_ACTIVE)
+      drv.seq_item_port.connect(seqr.seq_item_export);
+  endfunction
+endclass
+
+---------------------------------------------------------------------------
+
+💡 7. Why We Use super
+super calls the parent’s implementation of a method.
+
+Example:
+super.build_phase(phase);
+
+ensures the parent’s setup runs before your code. If you skip it, you may miss important initialization done by higher-level classes.
+
+---------------------------------------------------------------------------
+
+⚙️ 8. uvm_config_db — The Configuration Database
+A hierarchical key–value database for passing configuration or object handles (like virtual interfaces) from parent components (test/env) to children (agent/driver/monitor).
+
+Think:
+A parent leaves a “sticky note” with settings for its children. Each child reads its note during build_phase.
+
+---------------------------------------------------------------------------
+
+📦 9. Why It Exists
+Without it, you’d have to:
+Pass arguments through every constructor, or
+Use global variables.
+
+uvm_config_db provides:
+Loose coupling between components
+Easy reuse and overrides
+Hierarchical propagation of settings
+
+---------------------------------------------------------------------------
+
+🔑 10. The API
+
+Set (from parent)
+uvm_config_db#(T)::set(
+  uvm_component cntxt,
+  string inst_path,
+  string field_name,
+  T value
+);
+Get (from child)
+bit ok = uvm_config_db#(T)::get(
+  uvm_component cntxt,
+  string inst_path,
+  string field_name,
+  output T value
+);
+
+Parameter	                                                   Meaning
+T	                                      Data type (e.g., virtual my_if, int, my_cfg)
+cntxt	                                  Starting component for search (this or null)
+inst_path	                              Target path ("env.agent.*", "", etc.)
+field_name	                            Key name ("vif", "cfg", etc.)
+value	Value                             to set or variable to receive value(Ex:Set-my_if_if,get-vif)
+
+---------------------------------------------------------------------------
+
+🧠 11. The Virtual Interface Example
+a) Define the interface
+interface my_if(input logic clk, rst_n);
+  logic valid, ready;
+  logic [31:0] data;
+endinterface
+
+
+b) Instantiate interface & DUT in tb_top
+
+my_if my_if_if(.clk(clk), .rst_n(rst_n));
+dut u_dut(
+  .clk   (clk),
+  .rst_n (rst_n),
+  .valid (my_if_if.valid),
+  .ready (my_if_if.ready),
+  .data  (my_if_if.data)
+);
+
+Here, my_if_if are the actual wires connected to the DUT.
+
+
+c) Provide it to UVM via set
+initial begin
+  uvm_config_db#(virtual my_if)::set(
+    null, "uvm_test_top.env.agent.*", "vif", my_if_if
+  );
+end
+
+
+d) Retrieve it in driver/monitor via get
+virtual my_if vif;
+function void build_phase(uvm_phase phase);
+  super.build_phase(phase);
+  if (!uvm_config_db#(virtual my_if)::get(this, "", "vif", vif))
+    `uvm_fatal("NOVIF","Virtual interface not set");
+endfunction
+
+After the get, vif points to the real interface instance my_if_if. Now the class can drive or monitor DUT signals through vif.
+
+---------------------------------------------------------------------------
+
+🔄 12. Meaning of Each set / get Argument
+
+SET::
+Arg	                                                   Meaning
+null	                                    Global context (since tb_top isn’t a UVM component)
+"uvm_test_top.env.agent.*"	                   Target: all descendants of agent
+"vif"	                                                   Key name
+my_if_if	                                      Actual interface instance handle
+
+GET::
+Arg	                                                    Meaning
+this	                                      Start lookup from current component
+""	                                                  Lookup for myself
+"vif"	                                                 Same key name
+vif	                                           Variable that will hold the handle
+
+---------------------------------------------------------------------------
+
+🧩 13. Why Declare virtual my_if vif;
+Classes can’t own real wires. Declaring virtual my_if vif; creates a handle to be filled later.
+After get, it references the actual interface instance (my_if_if) from tb_top.
+
+---------------------------------------------------------------------------
+
+🔗 14. Data Flow Diagram
+       Module World (Hardware)
+ ┌──────────────────────────────────────┐
+ │ my_if my_if_if(...)                 │
+ │ ├─ valid / ready / data (nets)      │
+ │ └─ Connected to DUT ports           │
+ │                                     │
+ │   dut u_dut(.valid(my_if_if.valid));│
+ └──────────────────────────────────────┘
+                ▲
+                │  (handle via config_db)
+                ▼
+       Class World (UVM)
+ ┌──────────────────────────────────────┐
+ │ Driver / Monitor                    │
+ │  virtual my_if vif;                 │
+ │  build_phase: get("vif", vif);      │
+ │  run_phase: vif.valid <= 1; ...     │
+ └──────────────────────────────────────┘
+
+---------------------------------------------------------------------------
+
+⚠️ 15. Common Pitfalls
+Problem	                                Reason	                                                          Fix
+get fails	                          Wrong path or key	                              Use uvm_top.print_topology() to confirm instance names
+Type mismatch	                      Template type differs	                           Match #(virtual my_if) in both set/get
+Set too late	                      Done after build_phase	                             Do set in test/env build_phase or time 0
+Forgot virtual	               Classes cannot contain real signals	                 Always declare virtual interface handles
+Used new instead of create	          No factory override	                                    Always use ::type_id::create
+
+---------------------------------------------------------------------------
+
+✅ 16. Quick Recap
+Concept	                                          Simple Meaning
+build_phase()	                          Standard UVM function to create and configure components.
+void	                                       Returns nothing; used for setup only.
+uvm_phase phase	                           Phase handle (used for objections, sync).
+super	Calls                                    parent’s version of function.
+::type_id::create	                           Factory-based creation for flexibility.
+uvm_config_db	                             Hierarchical key–value database for configuration.
+virtual my_if                            	Handle connecting UVM class world to DUT wires.
+set / get	                                 Mechanism to pass handles or values through hierarchy.
+
+---------------------------------------------------------------------------
+
+🌟 One-Sentence Summary
+-->build_phase constructs your UVM world, and uvm_config_db connects that world to the real hardware through virtual interfaces and hierarchical configuration.
+
+---------------------------------------------------------------------------
+
+
