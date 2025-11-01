@@ -1,4 +1,21 @@
 1) Two base classes (the whole universe)
+
+The mental model (read this first)::::::::::::
+
+Think of a UVM testbench like a small company:
+uvm_test = the CEO: decides which departments exist and what scenario to run.
+uvm_env = the office: holds all departments (agents, scoreboard, coverage).
+uvm_agent = a department for one protocol/interface (e.g., AXI, APB).
+
+Inside each agent:
+driver = sends instructions to the world (drives pins).
+sequencer = feeds tasks to the driver (hands out transactions).
+monitor = listens to the world (samples pins, reports what happened).
+
+All of the above are uvm_components (they have hierarchy, ports, and phases).
+Transactions/Packets (the data you pass around) are uvm_objects (lightweight, no hierarchy).
+
+----------
 Think of UVM classes in two families:
 A) uvm_component → things that live in the testbench hierarchy
 They get built by UVM, have names/paths (like uvm_test_top.env.agent.drv), and participate in phases (build/connect/run, etc.).
