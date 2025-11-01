@@ -1,1 +1,96 @@
-g
+1) Two base classes (the whole universe)
+Think of UVM classes in two families:
+A) uvm_component → things that live in the testbench hierarchy
+They get built by UVM, have names/paths (like uvm_test_top.env.agent.drv), and participate in phases (build/connect/run, etc.).
+Examples: uvm_env, uvm_agent, uvm_driver, uvm_monitor, uvm_sequencer, uvm_test, uvm_scoreboard.
+
+B) uvm_object → data-ish things (no hierarchy, no phases)
+Lightweight objects; you construct them with ::type_id::create but they don’t have a place in the component tree.
+Examples: uvm_sequence_item (transactions/packets), uvm_sequence, config objects, small mail items/data structs.
+
+Rule of thumb:
+If it should appear in the component tree and run phases → component.
+If it’s data you pass around (packets, configs, messages) → object.
+
+-------------------------
+
+2) The standard structure (Test → Env → Agent → {Seqr, Drv, Mon})
+UVM encourages this clean, layered organization:
+
+uvm_test_top (uvm_test)
+  └── env (uvm_env)
+       ├── agent_0 (uvm_agent)   // e.g., AXI Master
+       │    ├── seqr (uvm_sequencer#(tx))
+       │    ├── drv  (uvm_driver#(tx))
+       │    └── mon  (uvm_monitor)
+       ├── agent_1 (uvm_agent)   // e.g., APB Slave (passive)
+       │    └── mon  (uvm_monitor)
+       └── sb (uvm_scoreboard)   // optional
+
+
+uvm_test: top-level “recipe” that builds/configures the env and starts sequences.
+uvm_env: the “lab room”—holds agents, scoreboard, coverage, and wiring (connecting monitor → scoreboard).
+uvm_agent: one-per-interface bundle:
+uvm_sequencer: hands out transactions to…
+uvm_driver: drives pins (via virtual interface) into the DUT.
+uvm_monitor: passively observes pins and publishes transactions (analysis port).
+
+Active vs Passive Agent:
+Active: has sequencer + driver + monitor (drives the bus).
+Passive: monitor only (just listens—useful if some other block already drives the interface).
+
+-------------------------------------------
+
+3) Where do uvm_objects fit?
+uvm_sequence_item (a.k.a. “transaction” / “packet”): fields like addr/data/write.
+uvm_sequence: creates/sends these items to the sequencer.
+Config objects: small objects that carry parameters/settings into components.
+They do not sit in the component tree; they’re created and used by components, especially in the run-time flow (sequence → driver).
+
+-------------------------------------------
+
+4) The phases you’ll use first
+build_phase (components): construct children with ::type_id::create, get config (e.g., virtual interface from uvm_config_db).
+connect_phase (components): hook up TLM connections (e.g., mon.ap.connect(sb.exp_port)).
+run_phase:
+In test: start sequences on a sequencer (seq.start(env.agent.seqr)).
+In driver/monitor: loops that drive or observe signals on the clock.
+
+That’s enough to start.
+
+-------------------------------------------
+
+5.Relationships you must remember
+uvm_test builds → uvm_env
+uvm_env builds → one or more uvm_agents
+uvm_agent(active) builds → uvm_sequencer, uvm_driver, uvm_monitor
+Sequences (objects) run on the sequencer, feeding the driver.
+Monitor publishes observed transactions to scoreboard/coverage via analysis ports.
+
+-------------------------------------------
+6)
+“Why do we need uvm_object vs uvm_component?”
+→ Objects are light data; Components are hierarchical building blocks with phases.
+
+“Where do I put code that toggles pins?”
+→ In the driver.run_phase (use a virtual interface).
+
+“Who creates packets?”
+→ The sequence (object) creates uvm_sequence_items and sends them to the sequencer.
+
+“Who checks correctness?”
+→ Usually scoreboard (component), fed by the monitor. Assertions can also check protocol rules.
+
+-------------------------------------------
+
+7)checklist when you build your first UVM TB
+
+ Define a transaction (uvm_sequence_item) with fields.
+ Write a sequence that randomizes/sends items.
+ Build driver (drives vif) and monitor (observes vif).
+ Wrap them in an agent (active or passive).
+ Build an env to hold agents (and scoreboard).
+ In test, start the sequence on the agent’s sequencer.
+ Pass the virtual interface into the agent via uvm_config_db.
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
