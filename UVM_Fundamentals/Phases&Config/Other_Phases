@@ -1,0 +1,145 @@
+# 🧩 UVM End Phases
+
+🎬 1. What Are End Phases?
+After `run_phase` (where the simulation actually runs and time moves), UVM automatically enters **end phases** to:
+* Collect results 📊
+* Perform final checks ✅
+* Print a summary 🧾
+
+They ensure that your test completes cleanly, with all data gathered and results clearly reported.
+
+----------------------------------------------------------
+
+⚙️ 2. Why Do We Need Them?
+When your simulation finishes, you want to know:
+* What happened during the test?
+* Did the DUT behave correctly?
+* Are there any errors or coverage gaps?
+
+End phases exist to **summarize and finalize** everything — like a closing report at the end of the workday.
+
+----------------------------------------------------------
+
+🧱 3. The Three Main End Phases
+
+| Phase             | Purpose                        | What You Typically Do                            |
+| ----------------- | ------------------------------ | ------------------------------------------------ |
+| **extract_phase** | Collect results and statistics | Gather scoreboard data, coverage, counters       |
+| **check_phase**   | Decide pass/fail               | Analyze collected results and verify correctness |
+| **report_phase**  | Print summary                  | Display final simulation report and status       |
+
+---
+
+Let’s go through them one by one 👇
+
+🔹 (1) extract_phase — *Collect results*
+This is where all verification components (like scoreboard, monitor, coverage collector) **submit their final data**.
+
+You gather:
+* Number of transactions
+* Errors or mismatches
+* Coverage data
+
+💡 Analogy: Everyone in the company sends their end-of-day report to the manager.
+
+🧱 Example:
+
+function void extract_phase(uvm_phase phase);
+  super.extract_phase(phase);
+  num_errors = scoreboard.get_error_count();
+  num_txns   = monitor.get_txn_count();
+endfunction
+
+
+✅extract_phase = “Collect all test results and metrics.”
+
+---
+
+🔹 (2) check_phase — *Final validation*
+Now that all results are collected, you **check** if the DUT passed or failed.
+
+You might:
+* Compare expected vs actual data
+* Check that error count = 0
+* Verify functional coverage goals
+
+💡 Analogy: The manager reviews all the reports and decides: “Was today successful or not?”
+
+🧱 Example:
+function void check_phase(uvm_phase phase);
+  super.check_phase(phase);
+  if (num_errors == 0)
+    `uvm_info("CHECK", "All tests passed ✅", UVM_LOW)
+  else
+    `uvm_error("CHECK", $sformatf("%0d errors found ❌", num_errors))
+endfunction
+
+
+✅ check_phase = “Judge if the test passed or failed.”
+
+---
+🔹 (3) report_phase — *Print summary*
+This is the **final** phase. UVM prints:
+* Test summary
+* Error and warning counts
+* Custom messages you define
+
+This is what appears at the end of your simulation log.
+
+💡 Analogy: At the end of the day, the manager gives a short presentation: “Here’s today’s summary: 0 errors, all tests passed!”
+
+🧱 Example:
+function void report_phase(uvm_phase phase);
+  super.report_phase(phase);
+  `uvm_info("REPORT", "Simulation completed successfully 🎉", UVM_NONE)
+endfunction
+
+✅ report_phase = “Print the final summary.”
+
+----------------------------------------------------------
+
+👀 4. Two Useful Visual Phases
+
+These two phases don’t belong to the end phases, but they’re great for debugging and visualization. They occur *before* time starts moving.
+
+| Phase                         | When It Happens                 | Purpose                                                   |
+| ----------------------------- | ------------------------------- | --------------------------------------------------------- |
+| **end_of_elaboration_phase**  | After build/connect, before run | Hierarchy is fully built — you can print topology         |
+| **start_of_simulation_phase** | Just before run_phase           | Final tweaks, banners, and setup before simulation begins |
+
+
+🧱 Example:
+function void end_of_elaboration_phase(uvm_phase phase);
+  super.end_of_elaboration_phase(phase);
+  uvm_top.print_topology(); // Prints testbench structure
+endfunction
+
+function void start_of_simulation_phase(uvm_phase phase);
+  super.start_of_simulation_phase(phase);
+  `uvm_info("SIM", "Starting simulation...", UVM_NONE)
+endfunction
+
+
+✅ **In short:**
+* **end_of_elaboration_phase:** Print component hierarchy.
+* **start_of_simulation_phase:** Final log banners and tweaks before time starts.
+
+----------------------------------------------------------
+🧠 5. Complete Simulation Flow (Big Picture)
+
+1️⃣ build_phase              → Create components
+2️⃣ connect_phase            → Connect components
+3️⃣ end_of_elaboration_phase → Print topology (optional)
+4️⃣ start_of_simulation_phase → Prepare to run
+5️⃣ run_phase                → Time-based simulation
+6️⃣ extract_phase            → Collect results
+7️⃣ check_phase              → Validate results
+8️⃣ report_phase             → Print final summary
+
+✅ The last three (extract, check, report) are the **end phases** — they finalize and summarize your test.
+
+----------------------------------------------------------
+
+🧩 **In simple terms:** `End Phases = The cleanup, checking, and reporting stages after your test finishes running.`
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
