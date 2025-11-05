@@ -1,0 +1,132 @@
+🧩 UVM Day 2 Concepts – Sequences, Parameterization & Handshake
+
+🧠 Concept 1 – Sequence Class (`uvm_sequence`)
+
+A **sequence** creates, randomizes, and sends transactions to the DUT via the **sequencer** and **driver**.
+It acts like a *script* controlling the DUT’s stimulus and order of operations.
+
+| Class               | Role        | Purpose                            |
+| ------------------- | ----------- | ---------------------------------- |
+| `uvm_sequence_item` | Data object | Describes one transaction          |
+| `uvm_sequence`      | Controller  | Generates and sends multiple items |
+
+
+Example
+
+class counter_seq extends uvm_sequence#(counter_item);
+  `uvm_object_utils(counter_seq)
+  task body();
+    repeat (5) begin
+      counter_item tr = counter_item::type_id::create("tr");
+      start_item(tr);
+      assert(tr.randomize());
+      finish_item(tr);
+    end
+  endtask
+endclass
+
+-------------------------------------
+
+🧩 Concept 2 – How Sequences Control Stimulus
+
+Step-by-Step Flow
+
+1️⃣ Sequence creates a `counter_item` transaction.
+2️⃣ `start_item(tr)` notifies the sequencer that an item is ready.
+3️⃣ Sequencer passes it to the driver.
+4️⃣ Driver drives DUT pins based on transaction data.
+5️⃣ Sequence repeats the process for multiple transactions.
+
+✅ **Purpose:** Automate stimulus generation → higher coverage with less code.
+
+--------------------------------------
+
+🔄 Concept 3 – Parameterized Sequences
+
+UVM allows parameterizing the sequence with the transaction type.
+
+class counter_seq extends uvm_sequence#(counter_item);
+
+This means your sequence is reusable — just change the transaction type!
+
+Example of Reuse
+
+class uart_seq extends uvm_sequence#(uart_item);
+class spi_seq  extends uvm_sequence#(spi_item);
+
+✅ The same `body()` flow works for different transaction types.
+
+Benefits
+
+| Benefit        | Description                            |
+| -------------- | -------------------------------------- |
+| 🔁 Reusability | Same sequence logic for different DUTs |
+| ⚙️ Scalability | Easy to extend for new interfaces      |
+| 🧩 Modularity  | One template serves multiple projects  |
+
+----------------------------------------
+
+🧠 Concept 4 – Difference Between `uvm_do`, `start_item`, and `finish_item`
+
+| Method                                  | Description                                             | Recommended?    |
+| --------------------------------------- | ------------------------------------------------------- | --------------- |
+| `` `uvm_do(tr) ``                       | Old macro combining create + start + randomize + finish | ❌ Legacy only   |
+| `` `uvm_do_with(tr, { constraints }) `` | Legacy shorthand with inline constraints                | ❌ Outdated      |
+| `start_item(tr)` / `finish_item(tr)`    | Modern explicit control                                 | ✅ Best practice |
+
+✅ Tip:
+Use `start_item` and `finish_item` for clarity, flexibility, and tool compatibility.
+
+--------------------------------------
+
+🤝 Concept 5 – Sequencer–Driver Handshake
+
+This is the **communication channel** that transfers transactions from the **sequence** to the **driver**.
+
+#🧱 Inside the Agent
+drv.seq_item_port.connect(seqr.seq_item_export);
+
+This connection links the driver and sequencer through TLM ports and exports.
+
+* `seq_item_port` → Driver’s input channel.
+* `seq_item_export` → Sequencer’s output channel.
+
+🧠 Inside the Driver
+
+task run_phase(uvm_phase phase);
+  counter_item tr;
+  forever begin
+    seq_item_port.get_next_item(tr); // Receive transaction
+
+    // Drive DUT pins
+    vif.reset  = tr.reset;
+    vif.enable = tr.enable;
+
+    `uvm_info("DRV",
+      $sformatf("Driving: reset=%0b enable=%0b", tr.reset, tr.enable),
+      UVM_LOW)
+
+    seq_item_port.item_done(); // Acknowledge completion
+  end
+endtask
+
+🔁 Handshake Flow
+
+| Step | Component | Action                                 |
+| ---- | --------- | -------------------------------------- |
+| 1️⃣  | Sequence  | Randomizes and sends item              |
+| 2️⃣  | Sequencer | Passes to driver via `seq_item_export` |
+| 3️⃣  | Driver    | Drives DUT signals                     |
+| 4️⃣  | Driver    | Calls `item_done()`                    |
+| 5️⃣  | Sequencer | Enables next item                      |
+
+
+---------------------------------------------------
+
+🧩 Key Takeaways
+
+* Sequences generate stimulus using `start_item` / `finish_item`.
+* Parameterization enables reusability across DUTs.
+* The sequencer–driver handshake ensures smooth, ordered communication.
+
+✅ Together, these form the **core stimulus generation and delivery flow** in UVM.
