@@ -1,4 +1,4 @@
-# 🧩 UVM Counter Verification Project – Summary
+# 🧩 UVM Counter Verification Project 
 
 ## 🎯 Goal
 
