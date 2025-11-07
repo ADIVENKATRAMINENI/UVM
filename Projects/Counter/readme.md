@@ -121,6 +121,6 @@ indicating successful stimulus-to-response flow across the entire UVM testbench.
 
 ---
 
-✅ **Summary:**
-This project forms a solid foundation for understanding *how a UVM testbench is structured and operates*.
+✅ **Summary:**<br>
+This project forms a solid foundation for understanding *how a UVM testbench is structured and operates*.<br>
 It’s an ideal starting point for beginners exploring **IP and subsystem-level verification** workflows.
