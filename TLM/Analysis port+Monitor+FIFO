@@ -1,0 +1,223 @@
+🧩 UVM Communication & Monitoring — TLM, Monitor, and FIFO Concepts
+----
+🔹 1️⃣ TLM 1.0 — Transaction-Level Modeling
+
+📘 What is TLM?
+TLM (Transaction-Level Modeling) is a method for **communicating data between UVM components** using **transactions (objects)** instead of directly manipulating **DUT signals**.
+
+Instead of connecting wires, UVM components exchange objects using TLM ports:
+Monitor → Scoreboard
+Driver  → Sequencer
+
+It provides **higher abstraction**, making your testbench **clean, modular, and reusable**.
+
+----
+
+⚙️ Why Use TLM in UVM?
+
+| Traditional Method | TLM Method |
+|--------------------|------------|
+| Signal-level connection (pins) | Object-level communication (transactions) |
+| Tight coupling | Loose coupling (reusable) |
+| Hard to reuse across designs | Works for any testbench structure |
+
+💡 *Think of TLM as sending "data packets" between verification components.*
+
+---
+
+🧱 Types of TLM Ports
+
+| Port Type | Purpose | Example Use |
+|------------|----------|--------------|
+| **put_port / export / imp** | Push transaction (blocking) | Driver → FIFO |
+| **get_port / export / imp** | Pull transaction (blocking) | Scoreboard → FIFO |
+| **peek_port** | Observe without consuming | Debug, Sampling |
+| **analysis_port / export / imp** | Broadcast transactions | Monitor → Scoreboard, Coverage |
+
+---
+
+📡 Publish–Subscribe Connection
+
+UVM uses a **publish–subscribe model** for one-to-many communication:
+Monitor → Scoreboard
+        → Coverage
+
+Flow Direction:
+analysis_port → analysis_export → analysis_imp
+
+✅ **Monitor (Publisher)** uses `analysis_port`  
+✅ **Scoreboard (Subscriber)** uses `analysis_imp` to receive data
+
+---
+
+⚖️ Difference Between TLM and Virtual Interface
+
+| Feature | Virtual Interface | TLM Connection |
+|----------|------------------|----------------|
+| Purpose | Connect TB to DUT | Connect TB components |
+| Level | Signal-level | Transaction-level |
+| Direction | Driver drives DUT | Monitor sends to Scoreboard |
+| Data Type | Logic / bit | Object / Class |
+
+💡 **Both coexist** — Drivers use interfaces, Monitors/Scoreboards use TLM.
+
+----------------------------------------------------------------------------------------------------------------------
+
+🔹 2️⃣ Monitor Implementation — The Passive Observer
+
+👀 What Is a Monitor?
+A **monitor** is a *passive component* in UVM that observes signals from the DUT using a **virtual interface**, creates **transactions**, and publishes them via an **analysis port**.
+It’s like a **CCTV camera** — it watches activity but never interacts or drives anything.
+
+---
+
+🧱 Monitor Implementation Steps
+
+1️⃣ Get virtual interface from `uvm_config_db`.  
+2️⃣ Sample DUT signals every clock cycle.  
+3️⃣ Create a `uvm_sequence_item` (transaction).  
+4️⃣ Send it using `analysis_port.write()`.
+
+---
+
+🧩 Example Code
+
+class counter_monitor extends uvm_monitor;
+  `uvm_component_utils(counter_monitor)
+  virtual counter_if vif;
+  uvm_analysis_port#(counter_item) ap;
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+    ap = new("ap", this);
+  endfunction
+
+  function void build_phase(uvm_phase phase);
+    if (!uvm_config_db#(virtual counter_if)::get(this, "", "vif", vif))
+      `uvm_fatal("MON", "Virtual interface not found");
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    counter_item tr;
+    forever begin
+      @(posedge vif.clk);
+      tr = counter_item::type_id::create("tr");
+      tr.count  = vif.count;
+      tr.enable = vif.enable;
+      ap.write(tr);  // Publish transaction
+    end
+  endtask
+endclass
+
+✅ **Passive**: The monitor doesn’t drive DUT pins.  
+✅ **Observer**: It reconstructs transactions and broadcasts them.
+
+---
+
+🧭 Flow Summary
+Driver → DUT → Monitor → Scoreboard
+
+- **Driver**: Drives DUT pins (active)
+- **Monitor**: Observes DUT outputs (passive)
+- **Scoreboard**: Checks functional correctness
+
+----------------------------------------------------------------------------------------------------------------------
+
+🔹 3️⃣ TLM FIFO (uvm_tlm_analysis_fifo)
+
+📦 What Is It?
+`uvm_tlm_analysis_fifo` acts as a **buffer** between the **monitor** and **scoreboard**.
+
+Instead of sending transactions directly using `ap.write()`,  the monitor writes into the FIFO — the scoreboard reads from it when ready. This prevents **data loss** when the monitor produces transactions
+faster than the scoreboard can consume them.
+
+---
+
+🔄 Connection Flow
+Monitor.ap → FIFO.analysis_export → Scoreboard.get_export
+
+- **Monitor writes** transactions into FIFO.
+- **Scoreboard retrieves** them later using `get()` or `peek()`.
+
+---
+
+🧩 Example Code
+
+In Environment:
+class counter_env extends uvm_env;
+  `uvm_component_utils(counter_env)
+  counter_monitor mon;
+  counter_scoreboard sb;
+  uvm_tlm_analysis_fifo#(counter_item) fifo;
+
+  function void build_phase(uvm_phase phase);
+    mon  = counter_monitor::type_id::create("mon", this);
+    sb   = counter_scoreboard::type_id::create("sb", this);
+    fifo = new("fifo", this);
+  endfunction
+
+  function void connect_phase(uvm_phase phase);
+    mon.ap.connect(fifo.analysis_export);
+    sb.get_port.connect(fifo.get_export);
+  endfunction
+endclass
+
+---
+
+Scoreboard (Consumer):
+class counter_scoreboard extends uvm_component;
+  `uvm_component_utils(counter_scoreboard)
+  uvm_get_port#(counter_item) get_port;
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+    get_port = new("get_port", this);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    counter_item tr;
+    forever begin
+      get_port.get(tr);
+      `uvm_info("SCOREBOARD", $sformatf("Received count=%0d", tr.count), UVM_LOW)
+    end
+  endtask
+endclass
+
+⚖️ When to Use FIFO vs Direct Write
+
+| Case | Use Direct Write (`ap.write()`) | Use FIFO |
+|------|----------------------------------|-----------|
+| Immediate reaction needed | ✅ Yes | ❌ No |
+| Slow or complex consumer | ❌ No | ✅ Yes |
+| Need transaction buffering | ❌ No | ✅ Yes |
+| Multiple subscribers | ✅ Yes | ✅ Yes (per subscriber FIFO) |
+
+---
+
+⚙️ Common FIFO Methods
+
+| Method | Description |
+|---------|--------------|
+| `put(tr)` | Push item into FIFO |
+| `get(tr)` | Get and remove item |
+| `peek(tr)` | View item without removing |
+| `try_get(tr)` | Non-blocking get |
+| `num()` | Returns number of stored transactions |
+
+---
+
+🧘 Summary Recap
+
+| Concept | Purpose | Connection Flow |
+|----------|----------|----------------|
+| **TLM 1.0** | Communicate using transactions | `port → export → imp` |
+| **Monitor** | Passive observer; publishes transactions | `analysis_port.write()` |
+| **TLM FIFO** | Buffers transactions between components | `monitor → fifo → scoreboard` |
+
+---
+
+💬Tip
+> TLM communication is like a “data highway” inside your UVM testbench —  
+> it ensures smooth and safe transaction flow between all components, no matter how fast or slow they are.
+
+---
