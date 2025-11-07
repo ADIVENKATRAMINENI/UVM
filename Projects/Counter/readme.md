@@ -2,7 +2,7 @@
 
 ## 🎯 Goal
 
-The goal of this project was to **build a complete UVM-based verification environment from scratch** for a simple 4-bit counter DUT. It demonstrates the **full UVM flow** — from creating transactions, sequences, and agents to running simulations and observing DUT behavior using **EDA Playground**.
+The goal of this project was to **build a complete UVM-based verification environment from scratch** for a simple 4-bit counter DUT. It demonstrates the **full UVM flow** from creating transactions, sequences, and agents to running simulations and observing DUT behavior using **EDA Playground**.
 
 ---
 
