@@ -74,14 +74,14 @@ The goal of this project was to **build a complete UVM-based verification enviro
 
 ## 🧩 Outcome
 
-✅ Successfully observed UVM phase flow (`build → connect → run`)
-✅ Randomized stimulus applied to DUT (reset/enable patterns)
-✅ Monitor printed live DUT values every cycle
-✅ Simulation ended gracefully using objections
+1. Successfully observed UVM phase flow (`build → connect → run`)
+2. Randomized stimulus applied to DUT (reset/enable patterns)
+3. Monitor printed live DUT values every cycle
+4. Simulation ended gracefully using objections
 
 ---
 
-## 💡 Learning Highlights
+## 💡 My Learning Highlights
 
 * Learned **how UVM components communicate** through ports, exports, and analysis paths.
 * Understood **factory creation, configuration propagation, and phase control**.
