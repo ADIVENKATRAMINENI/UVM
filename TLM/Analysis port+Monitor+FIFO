@@ -128,8 +128,8 @@ Driver → DUT → Monitor → Scoreboard
 📦 What Is It?
 `uvm_tlm_analysis_fifo` acts as a **buffer** between the **monitor** and **scoreboard**.
 
-Instead of sending transactions directly using `ap.write()`,  the monitor writes into the FIFO — the scoreboard reads from it when ready. This prevents **data loss** when the monitor produces transactions
-faster than the scoreboard can consume them.
+Instead of sending transactions directly using `ap.write()`,  the monitor writes into the FIFO — the scoreboard reads from it when ready. This prevents **data loss** 
+when the monitor produces transactions faster than the scoreboard can consume them.
 
 ---
 
