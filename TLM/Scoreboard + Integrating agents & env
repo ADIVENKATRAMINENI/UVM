@@ -1,0 +1,181 @@
+# 🧩 UVM Scoreboard — Architecture, Data Flow, and Checker Logic
+
+---
+🎯 Overview
+The **scoreboard** in UVM is the **core verification component** that checks whether the DUT (Design Under Test) produced the correct output for a given input.  
+It acts as the **truth verifier** of your testbench.
+
+💡Think of it as: “A teacher comparing a student’s (DUT) answers with the correct answer key (expected results).
+---
+
+🧱 1️⃣ Role of a Scoreboard
+
+| Purpose | Description |
+|----------|-------------|
+| **Compare Outputs** | Match DUT’s actual output with expected output |
+| **Detect Functional Bugs** | Find mismatches early in simulation |
+| **Centralized Checking** | Collects transactions from monitors |
+| **Report Results** | Uses UVM reporting (`uvm_info`, `uvm_error`) to log pass/fail |
+
+Typical UVM data flow:
+Driver → DUT → Monitor → Scoreboard
+
+---
+
+⚙️ 2️⃣ How the Scoreboard Works
+
+1. **Expected data** is generated — from the driver, reference model, or monitor (input side).  
+2. **Actual data** is observed — from another monitor (output side).  
+3. The scoreboard **compares** these and **reports results**.
+
+---
+
+Example Flow:
+Input Monitor → Expected Queue
+Output Monitor → Actual Queue
+Scoreboard → Compare & Log
+
+---
+
+📦 3️⃣ Storage Mechanisms
+
+The scoreboard temporarily stores transactions in **queues** or **FIFOs** before comparing them.
+
+counter_item expected_q[$];
+counter_item actual_q[$];
+
+✅ Use queues when order matters (FIFO behavior).  
+✅ Use TLM FIFOs when you want to decouple producer/consumer speeds.
+
+---
+
+🧩 4️⃣ Example — Simple Counter Scoreboard
+
+class counter_scoreboard extends uvm_component;
+  `uvm_component_utils(counter_scoreboard)
+
+  uvm_analysis_imp#(counter_item, counter_scoreboard) in_imp;
+  uvm_analysis_imp#(counter_item, counter_scoreboard) out_imp;
+
+  counter_item expected_q[$];
+  counter_item actual_q[$];
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+    in_imp  = new("in_imp", this);
+    out_imp = new("out_imp", this);
+  endfunction
+
+  // Receive expected data from input monitor
+  function void write(counter_item tr);
+    expected_q.push_back(tr);
+  endfunction
+
+  // Receive actual data from output monitor
+  function void write_out(counter_item tr);
+    actual_q.push_back(tr);
+    compare_results();
+  endfunction
+
+  // Compare logic
+  function void compare_results();
+    if (expected_q.size() && actual_q.size()) begin
+      counter_item exp = expected_q.pop_front();
+      counter_item act = actual_q.pop_front();
+
+      if (exp.count == act.count)
+        `uvm_info("SCOREBOARD", $sformatf("MATCH: count=%0d", act.count), UVM_LOW)
+      else
+        `uvm_error("SCOREBOARD", $sformatf("MISMATCH: exp=%0d act=%0d", exp.count, act.count))
+    end
+  endfunction
+endclass
+```
+
+---
+
+🔗 5️⃣ TLM Connections (Monitors → Scoreboard)
+
+Option 1: Direct Write (Fast)
+
+input_monitor.ap.connect(sb.in_imp);
+output_monitor.ap.connect(sb.out_imp);
+```
+
+Option 2: Buffered (Using FIFO)
+mon.ap.connect(fifo.analysis_export);
+sb.get_port.connect(fifo.get_export);
+
+🧠 *Use FIFO when the monitor is faster than the scoreboard.*
+
+---
+
+🧠 6️⃣ Reference Model vs Simple Checker
+
+| Type | Description | When to Use |
+|------|--------------|-------------|
+| **Simple Checker** | Compares actual vs expected transactions directly | For simple DUTs (counters, muxes, decoders) |
+| **Reference Model** | Behavioral model predicting expected outputs | For complex DUTs (CPU, routers, memory controllers) |
+
+💡 A **reference model** can be another SystemVerilog class or even a C++ model that predicts what the DUT *should* do.
+
+---
+
+📊 7️⃣ Example: Data Flow Diagram
+
+        +-------------+
+        |  Sequencer  |
+        +------+------+
+               |
+               v
+        +------+------+
+        |    Driver    |
+        +------+------+
+               |
+               v
+             [ DUT ]
+               |
+      +--------+--------+
+      | Input Monitor   |    ---> expected_q[]
+      | Output Monitor  |    ---> actual_q[]
+      +--------+--------+
+               |
+               v
+        +------+------+
+        |  Scoreboard |
+        +-------------+
+
+---
+
+🧾 8️⃣ Reporting and Logging
+
+Use standard UVM report macros to log comparison results.
+
+`uvm_info("SCOREBOARD", "Transaction matched", UVM_LOW)
+`uvm_error("SCOREBOARD", "Transaction mismatch detected")
+
+You can control verbosity via command-line:
++UVM_VERBOSITY=UVM_MEDIUM
+
+---
+
+## 💬 9️⃣ Summary — Key Takeaways
+
+| Concept | Description |
+|----------|--------------|
+| **Purpose** | Compare DUT output vs expected |
+| **Data Sources** | Monitors or reference model |
+| **Storage** | Queues or TLM FIFOs |
+| **Connections** | Analysis port → export → imp |
+| **Reporting** | `uvm_info`, `uvm_error` |
+| **Reusability** | Generic scoreboards can handle multiple protocols |
+
+---
+
+### 🧘 Final Tip for Beginners
+
+> Think of the **scoreboard** as your **UVM testbench’s brain** 🧠.  
+> It doesn’t drive signals — it **analyzes**, **compares**, and **judges** correctness,  
+> ensuring that your DUT behaves exactly as specified.
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
