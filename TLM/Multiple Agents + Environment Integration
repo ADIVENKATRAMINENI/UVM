@@ -1,0 +1,200 @@
+🔗 UVM TLM & Multi-Agent Environment Integration
+
+---
+🧩 1️⃣ Integrating Multiple Agents in UVM
+In complex SoCs, you rarely verify a single IP. You often have **multiple interfaces** like **UART + FIFO**, or **APB + GPIO**, working together.  
+Each interface has its own **agent** (driver, sequencer, monitor), and you integrate them into one environment.
+
+---
+
+🧱 Structure Overview
+
+| Component | Role |
+|------------|------|
+| **UART Agent** | Generates UART packets, monitors serial output |
+| **FIFO Agent** | Observes FIFO writes/reads |
+| **Scoreboard** | Compares UART and FIFO data consistency |
+| **Environment** | Instantiates both agents and connects them to scoreboard |
+
+🧠 Think:   > UART sends → FIFO receives → Scoreboard checks consistency.
+
+---
+
+⚙️ Example: Multiple Analysis Ports to Scoreboard
+Each monitor has an **`uvm_analysis_port`** for publishing observed data.  
+The **scoreboard** subscribes using multiple **`uvm_analysis_imp`** handles.
+
+// UART Monitor
+class uart_monitor extends uvm_monitor;
+  `uvm_component_utils(uart_monitor)
+  uvm_analysis_port#(uart_item) ap;
+  // Sampling code ...
+endclass
+
+// FIFO Monitor
+class fifo_monitor extends uvm_monitor;
+  `uvm_component_utils(fifo_monitor)
+  uvm_analysis_port#(fifo_item) ap;
+  // Sampling code ...
+endclass
+
+```
+🧮 Scoreboard Connecting Multiple Agents
+class multi_agent_scoreboard extends uvm_component;
+  `uvm_component_utils(multi_agent_scoreboard)
+
+  uvm_analysis_imp#(uart_item, multi_agent_scoreboard) uart_imp;
+  uvm_analysis_imp#(fifo_item, multi_agent_scoreboard) fifo_imp;
+
+  uart_item uart_q[$];
+  fifo_item fifo_q[$];
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+    uart_imp = new("uart_imp", this);
+    fifo_imp = new("fifo_imp", this);
+  endfunction
+
+  // Write from UART Monitor
+  function void write(uart_item tr);
+    uart_q.push_back(tr);
+  endfunction
+
+  // Write from FIFO Monitor
+  function void write(fifo_item tr);
+    fifo_q.push_back(tr);
+    compare();
+  endfunction
+
+  // Compare expected vs actual
+  function void compare();
+    if (uart_q.size() && fifo_q.size()) begin
+      uart_item u = uart_q.pop_front();
+      fifo_item f = fifo_q.pop_front();
+
+      if (u.data == f.data)
+        `uvm_info("SCOREBOARD", $sformatf("PASS: UART=%0d FIFO=%0d", u.data, f.data), UVM_LOW)
+      else
+        `uvm_error("SCOREBOARD", $sformatf("FAIL: UART=%0d FIFO=%0d", u.data, f.data))
+    end
+  endfunction
+endclass
+
+```
+
+🌉 Environment Connection
+class multi_agent_env extends uvm_env;
+  `uvm_component_utils(multi_agent_env)
+
+  uart_agent uart_ag;
+  fifo_agent fifo_ag;
+  multi_agent_scoreboard sb;
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    uart_ag = uart_agent::type_id::create("uart_ag", this);
+    fifo_ag = fifo_agent::type_id::create("fifo_ag", this);
+    sb      = multi_agent_scoreboard::type_id::create("sb", this);
+  endfunction
+
+  function void connect_phase(uvm_phase phase);
+    super.connect_phase(phase);
+    uart_ag.mon.ap.connect(sb.uart_imp);
+    fifo_ag.mon.ap.connect(sb.fifo_imp);
+  endfunction
+endclass
+
+✅ Now both monitors feed transactions to a **single scoreboard** via TLM analysis connections.
+
+---
+
+🧠 When to Use Multiple Exports
+
+| Situation | What You Should Do |
+|------------|--------------------|
+| DUT has multiple interfaces | Create one agent per interface |
+| Need to check data flow across agents | Use a single scoreboard with multiple `analysis_imp`s |
+| Timing differences between agents | Insert `uvm_tlm_analysis_fifo` |
+| Independent comparisons needed | Split into sub-scoreboards |
+
+---
+
+🧩 2️⃣ Environment Integration with TLM
+Now that we have multiple agents, let’s see how they integrate into a working **UVM Environment**.
+
+🔁 Data Flow Overview
+Sequence → Sequencer → Driver → DUT → Monitor → Scoreboard All communication between UVM components is **transaction-level** (TLM), not signal-level.
+
+---
+
+⚙️ UVM Phases Involved
+
+| Phase | Description |
+|--------|--------------|
+| **build_phase** | Create and configure all components |
+| **connect_phase** | Hook up sequencer-driver and monitor-scoreboard |
+| **run_phase** | Execute stimulus and collect results |
+
+---
+
+💡 Example Flow (Counter DUT)
+Sequence → Driver → DUT → Monitor → Scoreboard
+
+## build_phase()
+- Instantiate driver, monitor, scoreboard.
+
+## connect_phase()
+- Connect `seq_item_port` ↔ `seq_item_export` (driver ↔ sequencer).  
+- Connect `analysis_port` ↔ `analysis_imp` (monitor ↔ scoreboard).
+
+## run_phase()
+- Start sequences, drive DUT pins, collect results.
+
+---
+
+🧩 Example Integration
+
+class counter_env extends uvm_env;
+  `uvm_component_utils(counter_env)
+
+  counter_agent ag;
+  counter_scoreboard sb;
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    ag = counter_agent::type_id::create("ag", this);
+    sb = counter_scoreboard::type_id::create("sb", this);
+  endfunction
+
+  function void connect_phase(uvm_phase phase);
+    super.connect_phase(phase);
+    ag.mon.ap.connect(sb.imp); // TLM connection
+  endfunction
+endclass
+
+✅ Once connected, every transaction observed by the monitor automatically reaches the scoreboard for checking.
+
+---
+
+🧩 Full Simulation Flow Summary
+
+| Step | Flow | Components |
+|------|------|-------------|
+| 1️⃣ | **Sequence → Driver** | Stimulus generation |
+| 2️⃣ | **Driver → DUT** | Pin-level drive |
+| 3️⃣ | **Monitor → Scoreboard** | Capture & check |
+| 4️⃣ | **build_phase** | Create objects |
+| 5️⃣ | **connect_phase** | Hook up TLM links |
+| 6️⃣ | **run_phase** | Simulate & report |
+
+---
+
+🧘 Final Takeaway
+
+> In UVM, each agent focuses on one interface.  
+> The **environment (env)** brings all agents and scoreboards together.  
+> **TLM ports** act like wires between monitors, drivers, and scoreboards — but they carry **transactions**, not signals.
+
+Once you understand this **dataflow + phase flow**, you’re ready to build full reusable UVM environments!
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------
