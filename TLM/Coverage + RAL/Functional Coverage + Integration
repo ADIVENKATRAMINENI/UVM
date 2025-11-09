@@ -1,0 +1,167 @@
+Functional Coverage, Integration, and Command-Line Controls:::
+
+1️⃣ Functional Coverage Basics
+Functional coverage measures what scenarios or features were verified not just which lines of RTL code were executed.
+It ensures you’ve tested all functional combinations and behaviors of the DUT.
+
+
+🧠 Why Functional Coverage?
+Code coverage tells you which parts of the code ran,but functional coverage tells you if all required scenarios were tested.
+
+Type	                   What It Measures	                          Who Defines It	                            Example
+Code Coverage	         RTL code execution (lines, toggles)	            Simulator	                    if, case, signal toggle
+Functional Coverage	   Scenario-based verification	                    DV engineer                       	reset=1 + enable=0
+
+⚙️ Coverage Elements
+Term	                      Meaning	                                            Example
+Covergroup	          Container holding all coverpoints	            covergroup cg @(posedge clk); … endgroup
+Coverpoint	          Tracks one signal or variable	                         coverpoint enable;
+Bins	                  Define ranges or values of interest	                 bins high = {[10:15]};
+Cross Coverage	        Checks combinations of multiple signals	              cross reset, enable;
+Transition Bins	        Track value changes (state transitions)	                    (0 => 1)
+
+
+🧩 Example — Counter Coverage
+covergroup cg_counter @(posedge clk);
+coverpoint reset;
+coverpoint enable;
+coverpoint count {
+    bins low  = {[0:5]};
+    bins high = {[6:15]};
+  }
+cross reset, enable;
+endgroup
+
+The covergroup triggers each clock.
+sample() can also be called manually when valid data is seen.
+
+🧠 Sampling Coverage
+You can collect (sample) coverage manually or automatically:
+
+Method	                      Syntax	                                                           When to Use
+Automatic sampling	      covergroup cg @(posedge clk);	                              Simple timing-based sampling
+Manual sampling	             cg.sample();	                                          When event-based (like transaction valid)
+
+✅ Key Takeaways
+Functional coverage = Did I test all features?
+Code coverage = Did I run all code?
+
+Both together measure verification completeness.
+
+Always place functional coverage in monitors or subscribers to track real DUT behavior.
+
+---------------------------------------------------------
+
+2️⃣ Integrating Coverage into UVM
+Where to Place Coverage:
+Placement	                                                  Description	                                                           When to Use
+Inside Monitor	                         Coverage is sampled directly when signals are observed.	                            Small/simple designs
+Inside Subscriber (uvm_subscriber)	     Coverage collected separately via analysis port.	                                Multi-agent or layered systems
+
+
+💡 Coverage Inside the Monitor
+class counter_monitor extends uvm_monitor;
+  `uvm_component_utils(counter_monitor)
+  virtual counter_if vif;
+  uvm_analysis_port#(counter_item) ap;
+
+  covergroup cg @(posedge vif.clk);
+    coverpoint vif.reset;
+    coverpoint vif.enable;
+    cross vif.reset, vif.enable;
+  endgroup
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+    cg = new();
+    ap = new("ap", this);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    forever begin
+      @(posedge vif.clk);
+      cg.sample(); // sample coverage each cycle
+    end
+  endtask
+endclass
+
+✅ Easiest way — monitor already observes DUT pins.
+
+
+💡 Coverage Inside a Subscriber
+class counter_cov extends uvm_subscriber#(counter_item);
+  `uvm_component_utils(counter_cov)
+
+  covergroup cg;
+    coverpoint tr.reset;
+    coverpoint tr.enable;
+    cross tr.reset, tr.enable;
+  endgroup
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+    cg = new();
+  endfunction
+
+  function void write(counter_item tr);
+    cg.sample(); // sample when monitor sends transaction
+  endfunction
+endclass
+
+
+Then connect:
+mon.ap.connect(cov.analysis_export);
+
+✅ Monitor → publishes
+✅ Subscriber → listens and samples
+
+------------
+
+⚙️ Coverage Debug Options
+Function	                       Purpose	                                                  Example
+set_inst_name()	         Assigns custom name for instance	                     cg.set_inst_name("counter_cov");
+get_inst_coverage()	     Returns % of covered bins	                       $display("Coverage = %0.2f%%", cg.get_inst_coverage());
+
+
+🧩 Typical Flow Diagram
+Monitor ---> Analysis Port ---> Coverage Subscriber ---> covergroup.sample()
+
+✅ Key Takeaways
+Place coverage inside monitor or subscriber.
+Connect via TLM analysis port.
+Sample after valid transaction is observed.
+Use get_inst_coverage() to check real-time coverage status.
+
+-----------------------------------------------------
+
+3️⃣ UVM Command-Line Controls
+Why They Exist
+To avoid recompiling for every test or debug change you can pass runtime arguments (switches) to control test behavior.
+
+⚙️ Common UVM Command-Line Switches
+Switch	                         Description	                                                    Example
++UVM_TESTNAME	               Selects which test to run	                                +UVM_TESTNAME=fifo_test
++UVM_VERBOSITY	             Sets log detail level	                                    +UVM_VERBOSITY=UVM_HIGH
++UVM_OBJECTION_TRACE	       Shows raise/drop objection activity	                      +UVM_OBJECTION_TRACE
+
+
+🧩 Verbosity Levels
+Level                      	Detail	                        Typical Use
+UVM_NONE	              Show only errors	                 Regression runs
+UVM_LOW	                 Key milestones	                   Default logging
+UVM_MEDIUM	             Regular debug	                   Daily testing
+UVM_HIGH	               Detailed debug	                  Tracing transactions
+UVM_DEBUG	              Extremely verbose	                 Deep internal analysis
+
+✅ Best Practices
+Use low verbosity in regressions to keep logs short.
+Use high/debug verbosity for detailed waveform or log tracing.
+Combine +UVM_OBJECTION_TRACE to find hanging simulations.
+
+✅ Summary
+Concept	                                  Key Idea                                   	Why It’s Important
+Functional Coverage	          Defines what scenarios were tested	                Ensures all features verified
+Integrating Coverage	        Use monitors/subscribers to sample coverage	         Collects real DUT behavior
+Command-Line Controls	        Modify test/debug without code change	               Speeds up debug and regressions
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------
