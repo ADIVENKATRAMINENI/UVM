@@ -1,0 +1,56 @@
+
+
+
+
+
+
+
+
+// ================================================================
+// WHY CLOCKING BLOCK IS USED
+// ================================================================
+// In SystemVerilog/UVM testbenches, a clocking block is used to synchronize testbench stimulus and sampling with the DUT clock.
+// Without a clocking block, the testbench and DUT may update or read signals at the exact same simulation time (posedge clk), leading to race conditions:
+//
+//   - DUT updates outputs on posedge clk
+//   - DUT samples inputs on posedge clk
+//   - Testbench may also drive inputs or sample outputs at posedge
+//
+// This causes unpredictable simulation behavior, because the SystemVerilog scheduler cannot guarantee whether TB or DUT executes first at the same timestamp.
+
+
+// ================================================================
+// WHAT THE CLOCKING BLOCK FIXES
+// ================================================================
+// A clocking block separates the timing of testbench actions from DUT actions by introducing *skews* (#1step).
+//
+//   input  #1step → TB samples DUT outputs *after* DUT updates them
+//   output #1step → TB drives DUT inputs  *after* DUT samples them
+//
+// This ensures clean ordering:
+//
+//   1) DUT samples inputs at posedge clk
+//   2) DUT updates outputs at posedge clk
+//   3) TB samples DUT outputs (#1step later - safe)
+//   4) TB drives new inputs for next cycle (#1step after that - safe)
+//
+// No race, no delta-cycle conflicts, no nondeterministic behavior.
+
+
+// ================================================================
+// WHY SKEWS ONLY IN TESTBENCH, NOT IN DUT
+// ================================================================
+// The DUT models real hardware: flip-flops update and sample precisely at the active clock edge. A clocking block is a *test-bench-only construct* for simulation scheduling control.
+// Hardware cannot and should not have delayed behavior.Testbench, however, must avoid driving/sampling at the same time as the DUT, so skews are applied on the TB side only.
+//
+// ================================================================
+// SUMMARY
+// ================================================================
+// Clocking blocks:
+//
+// ✅ Avoid race conditions between TB & DUT
+// ✅ Ensure deterministic simulation behavior
+// ✅ Align TB reads/writes with DUT clocking
+// ✅ Provide clean sampling and driving order
+// ✅ Are used only in testbenches (never inside DUT)
+// ================================================================
