@@ -42,12 +42,53 @@
 // ================================================================
 // The DUT models real hardware: flip-flops update and sample precisely at the active clock edge. A clocking block is a *test-bench-only construct* for simulation scheduling control.
 // Hardware cannot and should not have delayed behavior.Testbench, however, must avoid driving/sampling at the same time as the DUT, so skews are applied on the TB side only.
-//
+
+
+// ================================================================
+// Why races happen:
+// ================================================================
+Because BOTH these are scheduled on the SAME event:
+
+always_ff @(posedge clk)    // DUT
+initial forever @(posedge clk) // TB via cb
+
+If both DUT and TB try to:
+sample inputs
+update outputs
+drive new inputs
+
+at the same posedge,
+SystemVerilog must decide: “Who runs first?”
+
+But there is no deterministic rule. So:
+❌ TB might run first
+❌ or DUT might run first
+❌ it may change between runs
+❌ values become unpredictable
+
+Hence → race condition.
+
+
+// ================================================================
+Simple Rules to Remember Forever
+// ================================================================
+✔ DUT = real hardware
+DUT always acts exactly at the clock edge.
+
+✔ TB = simulation logic
+TB must NOT act at the exact edge → otherwise race.
+
+✔ Skew enforces ordering
+DUT first → TB second
+
+✔ Skew is NOT a time delay
+It's a scheduler push to next delta cycle.
+
+
 // ================================================================
 // SUMMARY
 // ================================================================
 // Clocking blocks:
-//
 // ✅ Avoid race conditions between TB & DUT
 // ✅ Ensure deterministic simulation behavior
 // ✅ Align TB reads/writes with DUT clocking
