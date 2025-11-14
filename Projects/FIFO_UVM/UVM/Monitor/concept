@@ -1,1 +1,58 @@
-d
+//======================================================================
+// 📘  Monitor Concepts Summary
+//======================================================================
+/*
+  🧠 Role:
+  --------
+  - The monitor is a passive observer of the DUT’s behavior.
+  - It samples interface signals at every clock edge and translates
+    low-level pin activity into high-level transactions (write/read).
+
+  📡 Analysis Ports:
+  ------------------
+  - uvm_analysis_port is a built-in UVM class for one-way broadcast.
+  - When monitor calls ap_write.write(w), all connected subscribers
+    (like scoreboard or coverage) automatically receive that transaction.
+  - Multiple subscribers can connect to the same port — no duplication needed.
+
+  🧩 Why use conditions:
+  ----------------------
+  - The monitor’s "if" conditions act as *filters*.
+  - It records only *successful operations* for functional checking.
+  - Failed or illegal attempts (like write when full, read when empty)
+    can be logged or covered separately, but not sent to scoreboard.
+
+  🧮 What monitor actually sends:
+  ------------------------------
+  - It doesn’t re-drive or re-simulate DUT behavior.
+  - It simply *captures* DUT’s inputs/outputs and sends copies
+    (fifo_write_s / fifo_read_s structs) for comparison or coverage.
+
+  🔄 Timing:
+  ----------
+  - The monitor samples at posedge of clk, same as DUT internal logic.
+  - This ensures transactions reflect actual DUT behavior in that cycle.
+
+  🧭 Typical Connections:
+  -----------------------
+  In the environment, we connect:
+      agent.monitor.ap_write.connect(scoreboard.write_export);
+      agent.monitor.ap_read.connect(scoreboard.read_export);
+  → This automatically triggers scoreboard.write() whenever
+    monitor calls ap_write.write(w).
+
+  💡 Advanced Tip:
+  ----------------
+  - To make the monitor smarter, you can add assertions inside it
+    to flag illegal protocol cases like:
+        assert (!(vif.wr_en && vif.full && !vif.rd_en));
+        assert (!(vif.rd_en && vif.empty));
+    These make it a lightweight protocol checker too.
+
+  ✅ Summary:
+  -----------
+  - Passive observer, not a driver.
+  - Converts pin activity → transaction events.
+  - Broadcasts events to subscribers via analysis ports.
+  - Filters only valid FIFO actions for scoreboard.
+  - Logs invalid ones for debug or coverage.
