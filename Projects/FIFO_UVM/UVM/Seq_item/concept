@@ -1,1 +1,5 @@
-s
+Purpose:
+//   The sequencer acts as the "middleman" between sequences and driver.
+//   It sends one transaction at a time to the driver upon request.
+//
+// Note: For simple FIFOs, this is a passive relay — no extra code needed.
