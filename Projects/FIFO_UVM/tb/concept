@@ -1,0 +1,101 @@
+
+-----------------------------------------------------------------
+✅ 1. FILE: docs/tb_top.md
+# 📘 tb_top.sv — Top-Level Testbench (Complete Explanation)
+This file is the **entry point** of the entire verification environment.
+It is the only SystemVerilog module that directly interacts with:
+
+- DUT  
+- Interface  
+- Clock & Reset  
+- UVM testbench via config_db  
+- Simulator execution  
+
+Understanding `tb_top.sv` is essential because **every UVM component depends on it**.
+
+---
+
+# ## 1. Role of tb_top
+
+`tb_top.sv` is responsible for:
+
+### ✔ Creating clock  
+### ✔ Generating reset  
+### ✔ Instantiating the interface  
+### ✔ Instantiating the DUT  
+### ✔ Connecting DUT signals to the interface  
+### ✔ Passing virtual interface into the UVM testbench  
+### ✔ Passing FIFO parameters (e.g., DEPTH) to the scoreboard  
+### ✔ Starting the selected UVM test  
+
+Without `tb_top`, nothing in UVM can run.
+
+---
+
+# ## 2. Clock Generation
+
+logic clk;
+initial clk = 0;
+always #5 clk = ~clk;  // 100 MHz
+
+A simple 10 ns clock used by DUT and interface clocking block.
+
+
+## 3. Interface Instantiation
+fifo_if #(DATA_WIDTH) vif(clk);
+
+This creates a real interface nstance containing all DUT pins:
+wr_en
+rd_en
+din
+dout
+full/empty/almost flags
+clocking block
+modports (drv, mon)
+
+This instance is later converted into a virtual interface for UVM components.
+
+  
+## 4. Reset Logic
+initial begin
+  vif.rst_n = 0;
+  repeat (5) @(posedge clk);
+  vif.rst_n = 1;
+end
+
+Asserts reset for 5 cycles, then deasserts it.
+
+  
+## 5. DUT Instantiation
+fifo_sync #(
+  .DATA_WIDTH(DATA_WIDTH),
+  .DEPTH(DEPTH),
+  .ALMOST_FULL_LEVEL(ALMOST_FULL_LEVEL),
+  .ALMOST_EMPTY_LEVEL(ALMOST_EMPTY_LEVEL)
+) dut (...);
+
+Connects DUT signals directly to the interface pins.
+
+  
+## 6. Passing VIF to UVM
+uvm_config_db#(virtual fifo_if.drv)::set(null, "uvm_test_top", "vif_drv", vif);
+uvm_config_db#(virtual fifo_if.mon)::set(null, "uvm_test_top", "vif_mon", vif);
+
+This is how UVM gains access to DUT signals.
+vif_drv → goes to driver
+vif_mon → goes to monitor & coverage
+
+
+## 7. Passing DEPTH to Scoreboard
+uvm_config_db#(int unsigned)::set(null, "uvm_test_top", "DEPTH", DEPTH);
+
+Scoreboard uses DEPTH to:
+Build shadow pointers
+Detect full/empty
+Model wrap behavior
+
+
+## 8. Starting UVM Test
+run_test();  // or +UVM_TESTNAME=random_test
+
+Begins simulation and UVM phase execution.
