@@ -47,11 +47,8 @@ fifo_verification/
 │       └── tb_top.sv
 │
 ├── docs/                     # Project documentation (explains everything)
-│   └── FIFO_Verification_Report.md
-│
-├── waveforms/                # Screenshots / waveform captures
-│
-└── run.do                    # QuestaSim run script (optional)
+   └── FIFO_Verification_Report.md
+
 </pre>
 
 <p>
