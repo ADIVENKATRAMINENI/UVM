@@ -1,1 +1,39 @@
-a
+//======================================================================
+// SUMMARY OF DRIVER BEHAVIOR
+//======================================================================
+/*
+  🧠 Timing and behavior explanation:
+
+  - Driver uses 'vif.cb' (clocking block) to drive all DUT inputs in sync
+    with the DUT's clock (posedge clk).
+
+  - Each nonblocking assignment (<=) schedules the signal to be driven
+    at the *next* posedge of clk (not immediately), ensuring clean timing.
+
+  - DUT samples wr_en/rd_en/din at posedge clk and performs the operation.
+
+  - After that, driver deasserts wr_en/rd_en for 1 cycle (driven again
+    at next posedge) — this produces one clean clock-wide enable pulse.
+
+  - Example timeline for 10ns clock (clk toggles every #5):
+      5ns  -> DUT sees init zeros
+      15ns -> DUT samples wr_en=1, rd_en=0, data=valid
+      25ns -> DUT sees wr_en=0 again (idle)
+      35ns -> Next wr_en/data driven (next transaction)
+      => So DUT performs a real operation every 20ns (one active + one idle cycle)
+
+  - If we want continuous (back-to-back) operations, we can remove the
+    'wr_en <= 0' / 'rd_en <= 0' lines.
+
+  🧩 Object creation concept:
+    - The sequence creates and randomizes fifo_txn objects.
+    - The driver just gets a reference (handle) to that object.
+    - So, we don't call fifo_txn::create() inside the driver.
+    - If we did, we’d be creating a duplicate, useless object.
+
+  ✅ Summary:
+    - Sequence → creates + randomizes transactions
+    - Sequencer → delivers them
+    - Driver → drives them onto interface pins via vif.cb
+    - DUT → samples and executes them at posedge clk
+*/
