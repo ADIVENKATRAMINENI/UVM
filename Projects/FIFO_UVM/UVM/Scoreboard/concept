@@ -1,1 +1,56 @@
-g
+
+//======================================================================
+// 📘 SCOREBOARD CONCEPT SUMMARY
+//======================================================================
+/*
+🧠 Role:
+--------
+  • The scoreboard is an independent checker that predicts DUT behavior.
+  • It uses a “reference model” to verify data integrity and protocol correctness.
+
+📡 Data Flow:
+-------------
+    Monitor → (ap_write/ap_read) → Scoreboard (imp_w/imp_r)
+    Each WRITE/READ event from monitor automatically calls the corresponding
+    scoreboard.write() function.
+
+🏗 Internal Model:
+------------------
+  ref_q       : Stores expected FIFO contents.
+  wptr/rptr   : Shadow pointers track location and wrap bit.
+  DEPTH/PTR_W : Define FIFO geometry so model matches DUT logic.
+
+🔍 Checks Performed:
+--------------------
+  • Data integrity:  Expected data == DUT data
+  • FIFO order:      First-in, first-out preserved
+  • Overflow:        Write seen while FULL
+  • Underflow:       Read seen while EMPTY
+  • Reference sync:  Model and DUT remain aligned through shadow pointers.
+
+⚙️ Reset Handling:
+------------------
+  reset_model() keeps scoreboard’s mirror FIFO empty and pointers at zero,
+  ensuring it matches DUT’s reset condition.
+
+📈 Why This Matters:
+--------------------
+  Without a scoreboard, you’d have to check DUT waveforms manually.
+  With it, verification becomes automatic and self-checking.
+
+🧩 Connections in Environment:
+------------------------------
+  agent.monitor.ap_write.connect(scoreboard.imp_w);
+  agent.monitor.ap_read.connect(scoreboard.imp_r);
+
+  → No run_phase needed: write() functions trigger automatically whenever
+    monitor publishes a transaction.
+
+✅ Summary:
+-----------
+  - Passive checker (no driving)
+  - Mirrors DUT FIFO in software
+  - Detects mismatches & illegal operations
+  - Reports errors automatically
+*/
+//======================================================================
