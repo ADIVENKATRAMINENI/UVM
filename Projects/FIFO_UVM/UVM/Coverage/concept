@@ -1,1 +1,177 @@
-f
+📘 FIFO Functional Coverage — Concepts & Explanation
+
+This document explains functional coverage used in UVM for verifying a Synchronous FIFO.
+It covers covergroups, coverpoints, bins, crosses, sampling, and why coverage is needed.
+
+🔶 1. What Is Functional Coverage?
+Functional coverage answers one question:
+“Did we test ALL important FIFO scenarios?”
+
+It does not check correctness (that is the scoreboard’s job).
+It checks completeness of testing.
+
+Examples of questions coverage answers:
+Did FIFO ever become full or empty?
+Did almost_full / almost_empty ever toggle?
+Did we attempt reads on empty? Writes on full?
+Did we hit simultaneous wr+rd?
+Did we hit full bypass (wr=1 & rd=1 & full=1)?
+
+
+🔶 2. What Is a Covergroup?
+A covergroup is a SystemVerilog construct that:
+Samples signals at a specified event (usually posedge clk)
+Contains coverpoints and crosses
+Records scenarios that occur in simulation
+
+Example:
+covergroup fifo_cg @(posedge vif.clk);
+  // coverpoints
+  // crosses
+endgroup
+
+The covergroup must be constructed using:
+fifo_cg = new();
+
+
+🔶 3. What Is a Coverpoint?
+A coverpoint tracks all values of a single signal or variable.
+
+Example:
+coverpoint vif.full;
+
+This creates two automatic bins:
+full == 0
+full == 1
+So you know if FIFO ever actually became full during testing.
+
+Used for:
+wr_en activity
+rd_en activity
+full / empty flag transitions
+almost_full / almost_empty behavior
+
+
+🔶 4. What Are Bins?
+A bin is a category of values inside a coverpoint.
+
+Example of user-defined bins:
+coverpoint data {
+  bins low  = {[0:15]};
+  bins mid  = {[16:127]};
+  bins high = {[128:255]};
+}
+
+
+Special bins:
+Type	Purpose
+illegal_bins	flag illegal values
+ignore_bins	exclude values from coverage
+
+In FIFO, we rely mostly on automatic bins because all signals are 1-bit.
+
+
+🔶 5. What Is a Cross?
+A cross measures combinations of multiple signals.
+
+Example:
+cross vif.wr_en, vif.full;
+
+This shows:
+Write attempted when full=0 (legal)
+Write attempted when full=1 (illegal or bypass)
+No write cases
+Crosses are critical for FIFO, because bugs happen in combinations, not in individual signals.
+
+
+🔶 6. FIFO-Specific Crosses Explained
+These crosses are essential for FIFO verification:
+✔ wr_full_x — Write vs Full
+wr_full_x : cross vif.wr_en, vif.full;
+
+This confirms tests exercised:
+normal writes
+writes when full=1 (overflow attempt)
+write+full cases (bypass cycles also included)
+✔ rd_empty_x — Read vs Empty
+rd_empty_x : cross vif.rd_en, vif.empty;
+
+Checks:
+underflow attempts
+legal read behavior
+✔ wr_rd_x — Simultaneous Write + Read
+wr_rd_x : cross vif.wr_en, vif.rd_en;
+
+
+Used to prove:
+FIFO supports concurrent read/write
+pointer behavior during simultaneous ops
+✔ bypass_on_full — Full Bypass Detection
+bypass_on_full : cross vif.wr_en, vif.rd_en, vif.full;
+
+This is the exact signature of full-bypass:
+wr_en = 1
+rd_en = 1
+full  = 1
+
+If this bin hits → bypass was genuinely tested.
+✔ almost_state_x — Almost Flag Sanity
+almost_state_x : cross vif.almost_full, vif.almost_empty;
+
+We ensure:
+Flags toggle correctly
+They never both become 1 simultaneously
+
+
+🔶 7. How Coverage Samples Signals
+Three main ways:
+✔ Clocked Sampling (used here)
+covergroup fifo_cg @(posedge vif.clk);
+
+Samples:
+wr_en
+rd_en
+full / empty
+almost_full / almost_empty
+every clock edge.
+
+
+🔶 8. How fifo_coverage Fits Into UVM
+        ┌────────────┐
+        │   DRIVER   │
+        └────────────┘
+               │
+               ▼
+        ┌────────────┐
+        │   DUT      │
+        └────────────┘
+               │
+   raw signals │
+               ▼
+        ┌────────────┐
+        │  MONITOR   │──────► sends transactions to scoreboard
+        └────────────┘
+               │
+    vif taps   ▼
+        ┌────────────┐
+        │ COVERAGE   │────► measures scenarios (not correctness)
+        └────────────┘
+
+
+Coverage is passive.
+It does not compare or check anything.
+It simply records signal activity and combinations.
+
+🔶 9. Why Coverage Is Required for FIFO Sign-off
+
+Coverage ensures:
+Feature	Verified?
+FIFO reaches full	✔
+FIFO reaches empty	✔
+Almost flags toggle	✔
+Underflow attempts happened	✔
+Overflow attempts happened	✔
+Simultaneous wr+rd tested	✔
+Full-bypass exercised	✔
+
+Coverage + Scoreboard + Sequences = Complete Verification
