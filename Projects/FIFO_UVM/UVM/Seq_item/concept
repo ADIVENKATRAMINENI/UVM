@@ -1,5 +1,7 @@
 Purpose:
-//   The sequencer acts as the "middleman" between sequences and driver.
-//   It sends one transaction at a time to the driver upon request.
+//   Represents ONE operation for the driver to perform on the FIFO.
+//   Each transaction carries the intent: write, read, or both,
+//   along with the data value for write operations.
 //
-// Note: For simple FIFOs, this is a passive relay — no extra code needed.
+// Think of it like: "a single instruction" sent from Sequence → Driver.
+// In UVM, all transactions extend `uvm_sequence_item` so they can be randomized, printed, compared, and sent via sequencer-driver handshakes.
