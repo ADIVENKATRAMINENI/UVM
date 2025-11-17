@@ -1,0 +1,82 @@
+
+UART Coverage 
+Coverage in UVM answers a different question than scoreboard:
+
+Component	                     Purpose
+Scoreboard	       Did the DUT behave correctly? (PASS / FAIL)
+Coverage	          Did the testbench exercise enough scenarios? (MEASUREMENT)
+
+Coverage does not check correctness.Coverage tells you how much of the UART behavior space is tested.
+
+
+🎯 Why do we need coverage in UART?
+Even if the scoreboard shows no mismatches, it does NOT guarantee:
+You tested different byte patterns
+You stressed RX with various traffic styles
+You covered back-to-back vs idle gap conditions
+
+Coverage shows how many real UART scenarios were exercised, so you can improve tests until everything important is hit.
+
+
+
+covergroup uart_cg @(posedge vif.clk);
+    coverpoint vif.rx_valid;
+    coverpoint vif.rx_data { bins low = {...}; bins mid = {...}; bins high = {...}; }
+    rx_valid_x_data : cross vif.rx_valid, vif.rx_data;
+endgroup
+
+🔍 What is the covergroup watching?
+✔ 1. rx_valid
+Tracks how often rx_valid pulses — meaning how many bytes RX actually produced.
+If rx_valid coverage is low → RX was not exercised enough.
+
+
+✔ 2. rx_data
+RX received bytes are grouped into three bins:
+Bin	    Range           	Meaning
+low	    0x00 – 0x1F      Low control values
+mid	    0x20 – 0x7F	     Mid values / printable ASCII
+high	  0x80 – 0xFF      High / extended values
+
+
+Purpose:
+Ensure testbench uses a wide variety of data values, not just one or two patterns.
+
+
+✔ 3. rx_valid_x_data (cross)
+Checks combinations of:
+When RX is valid
+What range of data is seen
+
+This ensures we actually received different types of values — not just generated them at TX.
+
+
+📌 What insights coverage can give
+Good coverage reports look like:
+rx_valid       100%
+rx_data.low     90%
+rx_data.mid     85%
+rx_data.high    88%
+rx_valid_x_data 85%
+
+
+Bad coverage reports might show:
+rx_data.low  90%
+rx_data.mid   0%   ← missing
+rx_data.high  0%   ← missing
+
+
+Meaning:
+Testbench needs to generate more mid/high-range bytes (improve randomization).
+
+
+// UART Coverage:
+// - Passive component that samples RX signals using uart_if.mon.
+// - coverpoint rx_valid tracks how often the receiver produces bytes.
+// - coverpoint rx_data divides the full 0x00–0xFF range into low/mid/high bins
+//   to ensure the testbench generates a wide variety of data patterns.
+// - cross rx_valid_x_data ensures that different data ranges are actually
+//   observed when rx_valid is high (not just generated at TX).
+// - Coverage report indicates how thorough the UART testing is and guides
+//   improvements to random sequences and constraints.
+
