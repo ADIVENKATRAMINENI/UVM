@@ -1,0 +1,46 @@
+UART Transaction Item — uart_txn
+
+In UVM, a transaction (also called sequence item) represents a single piece of information that will be driven into the DUT.
+For UART TX + RX verification, one transaction = one UART frame transfer.
+
+The uart_txn class defines what information the driver receives from sequences and what the scoreboard/monitor expects to compare.
+
+🧩 Code
+class uart_txn extends uvm_sequence_item;
+  rand bit [7:0] data;
+  rand int unsigned idle_cycles; // delay before starting next byte
+
+  constraint c_idle { idle_cycles inside {[0:10]}; }
+
+  `uvm_object_utils(uart_txn)
+
+  function new(string name="uart_txn");
+    super.new(name);
+  endfunction
+
+  function string convert2string();
+    return $sformatf("{data=0x%0h idle=%0d}", data, idle_cycles);
+  endfunction
+endclass
+
+
+🔍 Field-by-Field Explanation
+Line / Element	                                                       Meaning	                                                                       Why it is needed
+class uart_txn extends uvm_sequence_item;	           Defines a transaction object used by sequencer → driver	                            Sequence sends this txn to driver to stimulate DUT
+rand bit [7:0] data;	                                           The byte to transmit (0–255)	                                                    UART transfers one byte per frame
+rand int unsigned idle_cycles;	                          Number of idle cycles (no transmit) before next frame	                                   To test back-to-back vs spaced frames
+constraint c_idle { idle_cycles inside {[0:10]}; }	             Legal constraint on idle cycles	                                         Prevents unrealistic delays (e.g., 1 million cycles)
+`uvm_object_utils(uart_txn)	                                   Factory registration + automation helpers	                                        Required for creating via type_id::create()
+function new(string name="uart_txn");	                                    Constructor	                                                            Used when manually creating the transaction
+convert2string()	                                           Converts txn to printable format	                                              Very useful for debugging, logs, and scoreboard prints
+
+
+
+Tip:
+
+A UART transaction is intentionally byte-level and protocol-independent. It does not include start/stop bits because those are generated inside the DUT —
+and that generation is what the testbench must verify.
+
+So:
+Data bits → provided by transaction
+Start/stop/parity framing → verified by monitor and coverage
