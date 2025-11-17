@@ -1,0 +1,71 @@
+
+UART Scoreboard 
+The scoreboard is the checker of the UVM testbench. Its job is to compare what was transmitted by UART TX (expected) with what was received by UART RX (actual) and report PASS / FAIL.
+
+UART loopback testbench flow:
+Sequence → Driver → UART TX → (Loopback) → UART RX → Monitor → Scoreboard
+
+The monitor sends:
+TX observations → "expected" packets
+RX observations → "actual" packets
+
+The scoreboard checks that RX output matches TX input in the same order.
+
+
+🔹 Input Streams to Scoreboard
+
+The scoreboard doesn’t drive or sample any DUT signals. Instead, it receives data from two TLM analysis FIFOs:
+
+FIFO	                                      Meaning	Source
+exp_fifo	                   Expected stream	TX observation from monitor
+act_fifo	                   Actual stream	RX observation from monitor
+
+The FIFOs are fed by the monitor:
+ap_tx.write(tx_data) → exp_fifo
+ap_rx.write(rx_data) → act_fifo
+
+The scoreboard pops entries from both FIFOs and compares them.
+
+
+🔹 Why use TLM FIFOs instead of direct comparison?
+Because TX and RX events do not occur at the same time: 
+TX event happens when byte starts transmission.
+RX event happens after full serial frame is decoded.
+
+Therefore, comparison must not be instant — FIFO queues store events until both sides are ready.
+
+This solves:
+Timing mismatch
+Out-of-order checking
+Race conditions
+Data loss between monitor and scoreboard
+
+
+🔹 Scoreboard Matching Logic (Concept)
+loop forever:
+    exp_fifo.get(exp_item)     // expected byte (TX)
+    act_fifo.get(act_item)     // actual byte (RX)
+
+    if exp_item.data == act_item.data:
+        PASS
+    else:
+        FAIL
+
+A failure happens when:
+Byte is corrupted
+Bit ordering is wrong
+Frame was sampled incorrectly
+RX lost sync during high-speed streaming
+Start/stop bit timing errors affected RX
+Baud rate tolerance issues
+RX double-latched or missed a frame
+
+So scoreboard is the final judge that verifies end-to-end correctness.
+
+// - Receives expected TX bytes and actual RX bytes from monitor via analysis FIFOs.
+// - Maintains ordering using uvm_tlm_analysis_fifo to avoid race/timing mismatches.
+// - Compares exp.data vs act.data for each transaction.
+// - Reports PASS/FAIL for each byte.
+// - Detects data corruption, timing issues, lost bytes, duplicated bytes,
+//   wrong sampling, or wrong LSB/MSB ordering.
+// - Core component to validate end-to-end UART loopback behavior.
