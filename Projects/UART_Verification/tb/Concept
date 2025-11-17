@@ -1,0 +1,10 @@
+tb_top.sv is the top-level testbench that:
+- Generates clk (100 MHz) and reset.
+- Implements a simple baud rate generator using BAUD_DIV.
+- Instantiates uart_tx and uart_rx DUTs with DATA_WIDTH = 8.
+- Connects uart_tx.tx_line to uart_rx.rx_line via uart_if.serial_line (loopback).
+- Instantiates uart_if (vif) and connects DUT pins to interface.
+- Exposes the interface to UVM via uvm_config_db as vif_drv and vif_mon.
+- Calls run_test(), allowing different UVM tests (smoke, back_to_back, gap, random)
+  to be selected using +UVM_TESTNAME.
+This module bridges the RTL DUT and the UVM verification environment.
