@@ -1,0 +1,33 @@
+
+tests::::
+
+// base_test:
+// - Common UVM test that:
+//   * Fetches driver and monitor virtual interfaces (vif_drv, vif_mon).
+//   * Passes them via config_db to env.agt.drv, env.agt.mon, and env.cov.
+//   * Creates the uart_env instance.
+// - All specific tests (smoke/back_to_back/gap/random) extend this.
+
+
+// smoke_test:
+// - Extends base_test.
+// - Runs uart_smoke_seq on env.agt.sqr.
+// - Purpose: basic connectivity / sanity check with a few fixed bytes.
+
+
+// back_to_back_test:
+// - Extends base_test.
+// - Runs uart_back_to_back_seq on env.agt.sqr.
+// - Purpose: stress continuous TX/RX with no idle gaps between frames.
+
+
+// gap_test:
+// - Extends base_test.
+// - Runs uart_gap_seq on env.agt.sqr.
+// - Purpose: exercise UART under random idle gaps between frames.
+
+
+// random_test:
+// - Extends base_test.
+// - Runs uart_random_seq on env.agt.sqr.
+// - Purpose: long random regression to catch rare timing and data issues.
