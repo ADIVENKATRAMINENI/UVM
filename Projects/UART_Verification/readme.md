@@ -59,7 +59,7 @@ RX monitor → act_fifo.get(data)
 Compare: expected == actual
 </pre>
 
-<h2>🛡 Assertions (Built Inside Interface)</h2>
+<h2>🛡 Assertions</h2>
 <ul>
   <li>No <code>tx_start</code> while <code>tx_busy = 1</code></li>
   <li>Start bit must be LOW</li>
