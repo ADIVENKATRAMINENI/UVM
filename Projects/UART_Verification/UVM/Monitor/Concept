@@ -1,0 +1,16 @@
+
+// uart_monitor:
+// - Passive component that watches the UART interface.
+// - Uses a virtual interface (uart_if.mon) to sample signals.
+// - On TX side:
+//     * When tx_start is asserted and tx_busy == 0,
+//       it captures tx_data into uart_tx_s and sends it on ap_tx.
+//     * This represents "a new frame has been accepted for transmit".
+// - On RX side:
+//     * When rx_valid is high, it captures rx_data into uart_rx_s
+//       and sends it on ap_rx.
+//     * This represents "a full byte has been received by RX".
+// - The scoreboard subscribes to ap_tx (expected stream) and ap_rx
+//   (actual stream), and compares transmitted vs received bytes.
+// - This way, we verify end-to-end UART TX+RX loopback behavior
+//   at the byte level without manually decoding serial waveforms.
