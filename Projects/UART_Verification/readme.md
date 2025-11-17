@@ -68,7 +68,7 @@ Compare: expected == actual
   <li><code>rx_valid</code> only after complete frame reception</li>
 </ul>
 
-<h2>📊 Verification Sign-Off Flow (Industry Standard)</h2>
+<h2>📊 Verification Sign-Off Flow</h2>
 <pre>
 Directed Tests  +
 Random Tests    +
