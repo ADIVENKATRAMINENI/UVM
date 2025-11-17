@@ -41,8 +41,7 @@ uart_verification/
 │   └── top/                   # tb_top.sv (DUT ⟷ UVM env)
 │
 ├── docs/                      # Complete project documentation
-├── waveforms/                 # Simulation captures (optional)
-└── run.do                     # QuestaSim run script (optional)
+
 </pre>
 
 <h2>🧪 Testcases Implemented</h2>
