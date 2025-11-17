@@ -1,0 +1,111 @@
+📌 UART Interface
+
+🔷 What is an Interface?
+In SystemVerilog, an interface is a container that groups all DUT signals together. Instead of connecting many signals one by one between:
+DUT
+Testbench
+Driver
+Monitor
+
+
+Purpose of the clocking block
+To guarantee race-free, deterministic timing between UVM and DUT.
+
+Without a clocking block:
+Driver and DUT may update signals on same edge → race condition
+Monitor might sample before DUT updates → incorrect results
+
+So:
+Driver uses cb.tx_data, cb.tx_start
+Monitor uses cb.rx_data, cb.rx_valid, etc.
+This ensures clean simulation results.
+
+
+🔷 Modports — Access Rules for UVM Components
+modport drv (clocking cb, input rst_n);
+modport mon (input tx_start, tx_data, tx_busy,
+             input serial_line, rx_data, rx_valid, rst_n);
+
+Modports are permission settings describing which component can access what.
+
+
+🔹 drv modport — For Driver
+modport drv (clocking cb, input rst_n);
+
+The driver:
+Uses the clocking block to drive tx_start & tx_data
+Can read rst_n (for reset awareness)
+Cannot read internal RX signals
+Cannot drive serial_line or rx_data (safety)
+This protects the design from accidental driver errors.
+
+
+
+🔹 mon modport — For Monitor
+modport mon (
+  input tx_start, tx_data, tx_busy,
+  input serial_line, rx_data, rx_valid, rst_n
+);
+
+
+The monitor only observes signals.
+It never drives signals.
+
+This prevents:
+Monitor accidentally disturbing DUT timing
+Unintentional signal driving mistakes
+
+------------------------------------------------------------------------------------------------------------------------
+UART Assertions 
+
+Assertions (SystemVerilog Assertions – SVA) are used to validate protocol-level signal behaviors and timing rules during simulation.They do not check data values 
+— scoreboard already does that. Assertions check whether the UART behaves correctly electrically and temporally according to the protocol specification.
+
+
+Together:
+Scoreboard = WHAT outcome is produced
+Assertions = HOW signals behave during that outcome
+
+
+Assertions detect bugs like:
+Start bit not LOW
+Stop bit not HIGH
+TX output not idle HIGH
+tx_start issued while UART is busy
+rx_valid asserted prematurely
+
+These bugs can break real hardware, even if loopback simulation “seems fine”.
+Assertions give instant failure messages when protocol rules are violated → faster debug and higher confidence in design.
+
+
+🧩 Where Assertions Reside
+Assertions are placed inside the uart_if interface, because:
+All DUT signals are available there
+Assertions run continuously without needing UVM phases
+No need for extra wires or DPI connections
+You do not run or call assertions manually — they activate automatically during simulation.
+
+“I used a scoreboard for end-to-end data checking, and SystemVerilog Assertions inside the interface to enforce UART protocol timing — 
+ensuring that stop bits, start bits, idle behavior and tx_busy rules were always respected. Assertions catch waveform-level bugs, while scoreboard catches data-level bugs.”
+
+----------------------------------------------------
+Assertions validate **timing and protocol rules**, complementing scoreboard (functional correctness).
+Key components:
+- `sequence` — describes ordered signal behavior across cycles.
+- `property` — wraps a rule using sequence or single-cycle logic.
+- `assert property(...)` — activates the property and flags violations.
+
+Important operators:
+- `|->` — overlapping implication ("If A happens now, B must also hold in sequence")
+- `|=>` — non-overlapping implication ("If A happens now, B must start next cycle")
+- `##N` — N-cycle delay
+- `disable iff(reset)` — disables checks during reset
+
+Assertions catch issues like:
+- Illegal signal combinations (e.g., tx_start while tx_busy)
+- Protocol violations (bad start/stop timing)
+- Missed handshakes or ordering
+- Incorrect sequence of events
+
+Assertions **do not compare data** — they ensure **legal timing and behavior**.
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
