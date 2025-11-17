@@ -1,0 +1,79 @@
+UART Verification Sequences
+These sequences are written to verify UART TX + RX loopback functionality under different real-world traffic patterns. Each sequence targets specific protocol features and timing behaviors.
+
+🔹 1. uart_smoke_seq — Basic Connectivity & Sanity Test
+Sends a small set of known bytes (e.g., 0x55, 0xA5, 0x3C) with fixed idle gaps (e.g., 2 bit-times) between each frame.
+
+Why:
+Acts as the very first test to confirm the entire data path is connected properly:
+Sequence → Driver → TX → Loopback (TX→RX) → RX → Monitor → Scoreboard
+
+Features Verified:
+End-to-end loopback functionality
+Start / Data / Stop bits correctness
+LSB first data ordering
+TX and RX alignment correctness
+Idle behavior between frames
+Scoreboard and monitor connectivity
+
+If this sequence fails, no other sequence should be run until debug is completed.
+
+
+
+🔹 2. uart_back_to_back_seq — Stress Test (Maximum Throughput)
+Transmits many bytes consecutively with no idle gap (idle_cycles = 0), meaning the next start bit follows immediately after the previous stop bit.
+
+Why:
+This stresses baud timing, start/stop bit precision, and RX synchronization during continuous high-speed traffic—critical real-world scenario.
+
+Features Verified:
+Continuous frame transmission handling
+Stop bit duration accuracy (exactly 1 bit-time)
+RX sampling stability across long data stream
+No byte loss / no duplication / no corruption
+TX busy logic under maximum load
+Robust bit boundary synchronization
+
+If UART timing is slightly incorrect, this test will fail even if smoke test passed.
+
+
+🔹 3. uart_gap_seq — Real-World Traffic Simulation
+Transmits multiple bytes with random idle gaps (idle_cycles inside {[1:10]}) between frames.
+
+Why:
+UART traffic in real embedded systems is not uniform—data may arrive in bursts or occasionally. This test exercises varied idle timing.
+
+Features Verified:
+Correct idle behavior before next frame
+Timing recovery after random gaps
+RX start-bit detection after long idle periods
+Frame-to-frame synchronization under varied spacing
+End-to-end reliability under realistic traffic
+It forms a bridge between simple and full random testing.
+
+
+🔹 4. uart_random_seq — Full Regression / Robustness Test
+Transmits long sequences of fully randomized UART transactions (random data + random idle cycles).
+
+Why:
+To expose rare timing and corner-case bugs that appear only under unpredictable patterns. Best used for regression and sign-off.
+
+Features Verified:
+Complete end-to-end loopback correctness under random traffic
+TX/RX robustness across all patterns
+Long-run timing stability and no deadlocks
+Boundary value correctness (0x00, 0xFF, 0xAA, 0x55, etc.)
+No data loss / no duplication / no reordering
+Scoreboard accuracy and functional coverage growth
+
+This sequence provides the highest confidence that UART is reliable in real products.
+
+🧠 Summary                 
+Sequence	                             Traffic Pattern	                            Purpose                                           	What Main Bug It Catches
+uart_smoke_seq	                   Known data + fixed idle	                Connectivity + sanity                           check	Wiring / scoreboard / basic RX/TX failures
+uart_back_to_back_seq	                     No idle	                            Stress timing	                                Stop bit / baud synchronizer / RX alignment
+uart_gap_seq	                        Random idle gaps	                        Realistic behavior	                                   Idle detection / re-sync failures
+uart_random_seq	                  Random idle + random data	                      Full robustness	                                  Rare bugs / long-run timing / data corruption
+
+
+“These UVM sequences progressively validate UART loopback from basic connectivity to full random regression — ensuring correctness of TX framing, RX sampling, baud timing, idle behavior, and end-to-end data integrity under real-world traffic patterns.”
