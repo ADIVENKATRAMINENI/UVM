@@ -7,7 +7,7 @@ All files are organized into standard UVM hierarchy for easy readability and reu
 <pre>
 APB_Verification/
 │── docs/                → Project document (detailed)
-│── rtl/                 → APB DUT (slave)
+│── dut/                 → APB DUT (slave)
 │── interface/           → apb_if.sv (signals + assertions)
 │── tb/
 │    ├── seq_item/       → apb_tx.sv
