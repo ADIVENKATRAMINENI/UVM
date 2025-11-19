@@ -1,0 +1,21 @@
+
+package apb_pkg;
+  import uvm_pkg::*; `include "uvm_macros.svh"
+
+  `include "apb_txn.sv"
+  `include "apb_sequencer.sv"
+  `include "apb_sequences.sv"
+  `include "apb_driver.sv"
+  `include "apb_monitor.sv"
+  `include "apb_agent.sv"
+  `include "apb_scoreboard.sv"
+  `include "apb_coverage.sv"
+  `include "apb_env.sv"
+
+  // tests
+  `include "tests/base_test.sv"
+  `include "tests/smoke_test.sv"
+  `include "tests/write_read_test.sv"
+  `include "tests/back_to_back_test.sv"
+  `include "tests/random_test.sv"
+endpackage
