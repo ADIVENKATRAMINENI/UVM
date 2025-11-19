@@ -1,4 +1,4 @@
-<h1>🔹 APB Protocol Verification (UVM) — Project Overview</h1>
+<h1>🔹 APB Protocol Verification (UVM) - Project Overview</h1>
 
 <h2>📁 Project Structure</h2>
 <p>This repository contains a complete <strong>UVM-based APB Slave Verification Environment</strong>. </p>
