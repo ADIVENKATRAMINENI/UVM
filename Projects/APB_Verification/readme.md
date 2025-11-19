@@ -1,8 +1,7 @@
 <h1>🔹 APB Protocol Verification (UVM) — Project Overview</h1>
 
 <h2>📁 Project Structure</h2>
-<p>This repository contains a complete <strong>UVM-based APB Slave Verification Environment</strong>.  
-All files are organized into standard UVM hierarchy for easy readability and reuse.</p>
+<p>This repository contains a complete <strong>UVM-based APB Slave Verification Environment</strong>. </p>
 
 <pre>
 APB_Verification/
@@ -99,4 +98,4 @@ It verifies the APB protocol behavior thoroughly using a combination of:
 
 <p><strong>✔ Assertions + ✔ Scoreboard + ✔ Coverage + ✔ Random Tests</strong></p>
 
-<p>Perfect for showcasing your verification skills on GitHub and in interviews.</p>
+
