@@ -4,11 +4,10 @@
 
 <pre>
 AXI4Lite_Verification/
-│
-├── docs/                → Project document (detailed)
+│                → Project document (detailed)
 ├── dut/                 → axi_lite_slave.sv (DUT)
 ├── interface/           → axi_lite_if.sv (signals + assertions)
-├── tb/
+├── UVM/
 │    ├── seq_item/       → axi_txn.sv
 │    ├── sequences/      → smoke, write_read, back_to_back, random sequences
 │    ├── driver/         → axi_driver.sv
