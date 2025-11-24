@@ -1,140 +1,114 @@
-//==========================================================
-// dma_monitor.sv
-// AXI4 Monitor for DMA subsystem
-//==========================================================
-`include "dma_pkg.sv"
+// small beat structs (place near top of file or in a small package)
+typedef struct packed {
+  bit [31:0] addr;
+  bit [31:0] data;
+  bit [3:0]  wstrb;
+  bit        last;
+} axi_write_s;
 
+typedef struct packed {
+  bit [31:0] addr;
+  bit [31:0] data;
+  bit        last;
+} axi_read_s;
+
+// monitor
 class dma_monitor extends uvm_monitor;
-    `uvm_component_utils(dma_monitor)
+  `uvm_component_utils(dma_monitor)
 
-    // -----------------------------------------------------
-    // Virtual interface
-    // -----------------------------------------------------
-    virtual axi_if mon_axi;
+  virtual axi_if mon_axi;
+  uvm_analysis_port #(axi_write_s) ap_wr;
+  uvm_analysis_port #(axi_read_s)  ap_rd;
 
-    // -----------------------------------------------------
-    // Analysis port to send observed transactions
-    // -----------------------------------------------------
-    uvm_analysis_port #(dma_txn) mon_ap;
+  // queues to hold outstanding addresses (will match with data beats)
+  bit [31:0] aw_addr_q[$]; // dynamic array used as queue
+  bit [31:0] ar_addr_q[$];
 
-    // -----------------------------------------------------
-    // Constructor
-    // -----------------------------------------------------
-    function new(string name = "dma_monitor", uvm_component parent);
-        super.new(name, parent);
-        mon_ap = new("mon_ap", this);
-    endfunction
+  function new(string name="dma_monitor", uvm_component parent=null);
+    super.new(name,parent);
+    ap_wr = new("ap_wr", this);
+    ap_rd = new("ap_rd", this);
+  endfunction
 
-    // -----------------------------------------------------
-    // BUILD PHASE
-    // Fetch virtual interface from config DB
-    // -----------------------------------------------------
-    function void build_phase(uvm_phase phase);
-        super.build_phase(phase);
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    if(!uvm_config_db#(virtual axi_if)::get(this,"","vif",mon_axi))
+      `uvm_fatal("NOVIF", "AXI monitor: vif missing");
+  endfunction
 
-        if(!uvm_config_db#(virtual axi_if)::get(this, "", "vif", mon_axi)) begin
-            `uvm_fatal("NOVIF", "AXI monitor: virtual interface not found in config DB")
+  virtual task run_phase(uvm_phase phase);
+    fork
+      collect_aw();
+      collect_w();
+      collect_ar();
+      collect_r();
+    join_none
+  endtask
+
+  task collect_aw();
+    forever begin
+      @(posedge mon_axi.clk);
+      if (mon_axi.awvalid && mon_axi.awready) begin
+        aw_addr_q.push_back(mon_axi.awaddr);
+      end
+    end
+  endtask
+
+  task collect_w();
+    axi_write_s w;
+    bit [31:0] cur_addr;
+    forever begin
+      @(posedge mon_axi.clk);
+      if (mon_axi.wvalid && mon_axi.wready) begin
+        if (aw_addr_q.size() == 0) begin
+          `uvm_warning("MON", "W beat without AW address in queue")
+          cur_addr = '0;
+        end else begin
+          cur_addr = aw_addr_q[0]; // take oldest
+          if (mon_axi.wlast) begin
+            // pop address only on last beat of burst
+            aw_addr_q.pop_front();
+          end
         end
-    endfunction
+        w.addr = cur_addr;
+        w.data = mon_axi.wdata;
+        w.wstrb = mon_axi.wstrb;
+        w.last = mon_axi.wlast;
+        ap_wr.write(w);
+      end
+    end
+  endtask
 
-    // -----------------------------------------------------
-    // RUN PHASE
-    // Main sampling process
-    // -----------------------------------------------------
-    virtual task run_phase(uvm_phase phase);
-        super.run_phase(phase);
-        fork
-            collect_read_address();
-            collect_read_data();
-            collect_write_address();
-            collect_write_data();
-        join_none
-    endtask
+  task collect_ar();
+    forever begin
+      @(posedge mon_axi.clk);
+      if (mon_axi.arvalid && mon_axi.arready) begin
+        ar_addr_q.push_back(mon_axi.araddr);
+      end
+    end
+  endtask
 
-    // =====================================================
-    // AXI READ ADDRESS CHANNEL (AR)
-    // =====================================================
-    task collect_read_address();
-        dma_txn tr;
-        forever begin
-            @(posedge mon_axi.clk);
-            if (mon_axi.ar_valid && mon_axi.ar_ready) begin
-                tr = dma_txn::type_id::create("read_tr");
-                tr.addr  = mon_axi.ar_addr;
-                tr.len   = mon_axi.ar_len;
-                tr.size  = mon_axi.ar_size;
-                tr.burst = mon_axi.ar_burst;
-                tr.dir   = DMA_READ;
-
-                mon_ap.write(tr);
-                `uvm_info("MON", $sformatf("Captured READ AR addr=%0h len=%0d", tr.addr, tr.len), UVM_LOW)
-            end
+  task collect_r();
+    axi_read_s r;
+    bit [31:0] cur_addr;
+    forever begin
+      @(posedge mon_axi.clk);
+      if (mon_axi.rvalid && mon_axi.rready) begin
+        if (ar_addr_q.size() == 0) begin
+          `uvm_warning("MON", "R beat without AR address in queue")
+          cur_addr = '0;
+        end else begin
+          cur_addr = ar_addr_q[0];
+          if (mon_axi.rlast) begin
+            ar_addr_q.pop_front();
+          end
         end
-    endtask
-
-    // =====================================================
-    // AXI READ DATA CHANNEL (R)
-    // =====================================================
-    task collect_read_data();
-        dma_txn tr;
-        forever begin
-            @(posedge mon_axi.clk);
-
-            if (mon_axi.r_valid && mon_axi.r_ready) begin
-                tr = dma_txn::type_id::create("read_data_tr");
-                tr.data  = mon_axi.r_data;
-                tr.last  = mon_axi.r_last;
-                tr.dir   = DMA_READ_DATA;
-
-                mon_ap.write(tr);
-
-                `uvm_info("MON", $sformatf("Captured READ DATA data=%0h last=%0b", tr.data, tr.last), UVM_LOW)
-            end
-        end
-    endtask
-
-    // =====================================================
-    // AXI WRITE ADDRESS CHANNEL (AW)
-    // =====================================================
-    task collect_write_address();
-        dma_txn tr;
-        forever begin
-            @(posedge mon_axi.clk);
-            if (mon_axi.aw_valid && mon_axi.aw_ready) begin
-                tr = dma_txn::type_id::create("write_tr");
-                tr.addr  = mon_axi.aw_addr;
-                tr.len   = mon_axi.aw_len;
-                tr.size  = mon_axi.aw_size;
-                tr.burst = mon_axi.aw_burst;
-                tr.dir   = DMA_WRITE;
-
-                mon_ap.write(tr);
-
-                `uvm_info("MON", $sformatf("Captured WRITE AW addr=%0h len=%0d", tr.addr, tr.len), UVM_LOW)
-            end
-        end
-    endtask
-
-    // =====================================================
-    // AXI WRITE DATA CHANNEL (W)
-    // =====================================================
-    task collect_write_data();
-        dma_txn tr;
-        forever begin
-            @(posedge mon_axi.clk);
-            if (mon_axi.w_valid && mon_axi.w_ready) begin
-                tr = dma_txn::type_id::create("write_data_tr");
-                tr.data = mon_axi.w_data;
-                tr.strb = mon_axi.w_strb;
-                tr.last = mon_axi.w_last;
-                tr.dir  = DMA_WRITE_DATA;
-
-                mon_ap.write(tr);
-
-                `uvm_info("MON", $sformatf("Captured WRITE DATA data=%0h last=%0b", tr.data, tr.last), UVM_LOW)
-            end
-        end
-    endtask
+        r.addr = cur_addr;
+        r.data = mon_axi.rdata;
+        r.last = mon_axi.rlast;
+        ap_rd.write(r);
+      end
+    end
+  endtask
 
 endclass
-
