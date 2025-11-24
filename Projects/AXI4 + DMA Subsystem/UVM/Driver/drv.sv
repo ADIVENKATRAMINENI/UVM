@@ -53,11 +53,22 @@ class dma_driver extends uvm_driver #(dma_txn);
     virtual axi_if drv_axi;
 
     function new(string name, uvm_component parent);
-        super.new(name,parent);
+        super.new(name, parent);
+    endfunction
+
+    virtual function void build_phase(uvm_phase phase);
+        super.build_phase(phase);
+
+        if(!uvm_config_db#(virtual cfg_if)::get(this, "", "vif_cfg", drv_cfg))
+            `uvm_fatal("NOVIF", "cfg_if not found! Did you set it in top module?")
+
+        if(!uvm_config_db#(virtual axi_if)::get(this, "", "vif_axi", drv_axi))
+            `uvm_fatal("NOVIF", "axi_if not found! Did you set it in top module?")
     endfunction
 
     virtual task run_phase(uvm_phase phase);
         dma_txn txn;
+
         forever begin
             seq_item_port.get_next_item(txn);
 
@@ -66,10 +77,11 @@ class dma_driver extends uvm_driver #(dma_txn);
             drv_cfg.dst_addr <= txn.dst_addr;
             drv_cfg.length   <= txn.length;
             drv_cfg.start    <= 1;
+
             @(posedge drv_cfg.clk);
             drv_cfg.start    <= 0;
 
-            wait(drv_cfg.done==1);
+            wait(drv_cfg.done);
             seq_item_port.item_done();
         end
     endtask
