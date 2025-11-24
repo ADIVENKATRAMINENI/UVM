@@ -16,34 +16,20 @@ package dma_pkg;
     // Constraints
     // ------------------------------------
 
-    // Address alignment (word aligned)
-    constraint addr_align {
-        src_addr[1:0] == 2'b00;
-        dst_addr[1:0] == 2'b00;
-    }
+constraint c_addr_align {
+    src_addr % 4 == 0;
+    dst_addr % 4 == 0;
+}
 
-    // DMA length between 16 and 1024 bytes
-    constraint len_range {
-        length inside {[16:1024]};
-    }
+constraint c_length_valid {
+    length inside { [4:256] };
+    length % 4 == 0;
+}
 
-    // Length must be multiple of 4
-    constraint len_align {
-        length % 4 == 0;
-    }
-
-    // SRC and DST must not overlap too close
-    constraint no_overlap {
-        (dst_addr >= src_addr + length) ||
-        (src_addr >= dst_addr + length);
-    }
-
-    // Keep addresses inside a valid memory map (example: 4 KB = 4096)
-    constraint addr_range {
-        src_addr < 32'h1000;
-        dst_addr < 32'h1000;
-    }
-
+constraint c_addr_range {
+    src_addr inside { [0 : 'h0FFF] };
+    dst_addr inside { [0 : 'h0FFF] };
+}
 
 
         `uvm_object_utils(dma_txn)
