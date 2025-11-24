@@ -5,29 +5,31 @@ This repository contains a complete **UVM-based Simple Memory-Copy DMA + AXI4 Su
 📁 Project Structure
 <p>This repository contains a complete <strong>UVM-based Simple Memory-Copy DMA Subsystem Verification Environment</strong>.</p>
 
+```text
 DMA_AXI4_Verification/
 │── docs/ → Project document (detailed)
 │── rtl/ → DUT + AXI memory + interfaces
-│ ├── axi_if.sv → AXI4 interface signals
-│ ├── cfg_if.sv → DMA config interface
-│ ├── dma.sv → DMA module (DUT)
-│ ├── axi_mem.sv → Memory model
+│   ├── axi_if.sv → AXI4 interface signals
+│   ├── cfg_if.sv → DMA config interface
+│   ├── dma.sv → DMA module (DUT)
+│   ├── axi_mem.sv → Memory model
 │── tb/
-│ ├── dma_pkg.sv → Package for sequences, transaction items
-│ ├── dma_txn.sv → Transaction item
-│ ├── dma_sequences.sv → Smoke, burst, random sequences
-│ ├── dma_driver.sv → Driver
-│ ├── axi_monitor.sv → Monitor
-│ ├── dma_scoreboard.sv → Scoreboard
-│ ├── dma_coverage.sv → Coverage
-│ ├── dma_agent.sv → Agent
-│ ├── dma_env.sv → Environment
+│   ├── dma_pkg.sv → Package for sequences, transaction items
+│   ├── dma_txn.sv → Transaction item
+│   ├── dma_sequences.sv → Smoke, burst, random sequences
+│   ├── dma_driver.sv → Driver
+│   ├── axi_monitor.sv → Monitor
+│   ├── dma_scoreboard.sv → Scoreboard
+│   ├── dma_coverage.sv → Coverage
+│   ├── dma_agent.sv → Agent
+│   ├── dma_env.sv → Environment
 │── tests/
-│ ├── base_test.sv
-│ ├── smoke_test.sv
-│ ├── burst_test.sv
-│ ├── random_test.sv
+│   ├── base_test.sv
+│   ├── smoke_test.sv
+│   ├── burst_test.sv
+│   ├── random_test.sv
 │── tb_top.sv
+
 
 📌 Project Summary
 <p> This project verifies a <strong>Simple Memory-Copy DMA Subsystem</strong> using <strong>SystemVerilog and UVM methodology</strong>. It includes complete stimulus, checking, coverage, scoreboard, and assertions. </p> <ul> <li>Memory-to-memory DMA transfers over AXI4</li> <li>Assertions inside interfaces (protocol timing checks)</li> <li>Scoreboard compares expected vs actual memory content</li> <li>Monitor publishes read/write transactions via analysis ports</li> <li>Functional + code coverage goals</li> <li>Random, directed, and stress tests for full verification</li> </ul>
