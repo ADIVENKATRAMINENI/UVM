@@ -39,5 +39,5 @@ class axi_coverage extends uvm_component;
     cr_addr_data : cross(vif.AWADDR,vif.WDATA);
   endgroup
 
-  function new
+  
 
